@@ -1,0 +1,5 @@
+# Keep Linux line endings on files that run inside the Linux container (Windows would turn them into CRLF and the script fails)
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf

@@ -1,0 +1,29 @@
+<script>
+/* PWA: registers the service worker (offline page) and powers the "Install app" button when the browser offers installing */
+(function () {
+    if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+            navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(function () { /* the app works without it */ });
+        });
+    }
+
+    var installEvent = null;
+    var button = document.getElementById("install-app");
+
+    window.addEventListener("beforeinstallprompt", function (event) {
+        event.preventDefault();
+        installEvent = event;
+        if (button) { button.style.display = "inline-block"; }
+    });
+
+    if (button) {
+        button.addEventListener("click", function () {
+            if (!installEvent) { return; }
+            installEvent.prompt();
+            installEvent.userChoice.then(function () { installEvent = null; button.style.display = "none"; });
+        });
+    }
+
+    window.addEventListener("appinstalled", function () { if (button) { button.style.display = "none"; } });
+})();
+</script>

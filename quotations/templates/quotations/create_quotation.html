@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Quotation</title>
+    {% include "quotations/_pwa_head.html" %}
+
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f4f7fb;
+            color: #1f2937;
+        }
+
+        /* HEADER */
+        .header { background: #3B73B9; color: white; padding: 22px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .header-inner { max-width: 1000px; margin: auto; }
+        .header h1 { margin: 0; font-size: 24px; font-weight: 600; }
+        .header p { margin: 6px 0 0; font-size: 14px; opacity: 0.9; }
+
+        /* MAIN */
+        .container { max-width: 1000px; margin: auto; padding: 25px 20px 50px; }
+
+        .back { display: inline-block; margin-bottom: 18px; color: #3B73B9; text-decoration: none; font-size: 14px; font-weight: 500; }
+        .back:hover { text-decoration: underline; }
+
+        /* CARD */
+        .card { background: white; border-radius: 14px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+        .card-title { margin: 0 0 5px; font-size: 20px; color: #1f2937; }
+        .card-subtitle { margin: 0 0 22px; color: #6b7280; font-size: 14px; }
+
+        /* FORM GRID */
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 24px; }
+        .field { display: flex; flex-direction: column; }
+        .field.full { grid-column: 1 / -1; }
+        .field label { font-size: 14px; font-weight: 600; margin-bottom: 7px; color: #374151; }
+        .required { color: #dc2626; }
+
+        /* INPUTS */
+        input, select, textarea {
+            width: 100%;
+            height: 44px;
+            padding: 0 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 7px;
+            background: white;
+            color: #1f2937;
+            font-size: 14px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        textarea { height: auto; min-height: 76px; padding: 10px 12px; resize: vertical; }
+        input:focus, select:focus, textarea:focus { border-color: #3B73B9; box-shadow: 0 0 0 3px rgba(59,115,185,0.12); }
+        input::placeholder, textarea::placeholder { color: #9ca3af; }
+
+        /* OPTION CARDS */
+        .option-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .option-group.two { grid-template-columns: repeat(2, 1fr); }
+        .option { position: relative; }
+        .option input { position: absolute; opacity: 0; pointer-events: none; }
+        .option label {
+            display: flex; align-items: center; justify-content: center;
+            min-height: 48px; padding: 10px 12px;
+            border: 1px solid #d1d5db; border-radius: 8px; background: white;
+            cursor: pointer; font-size: 14px; font-weight: 500; text-align: center; transition: all 0.2s ease;
+        }
+        .option label:hover { border-color: #3B73B9; background: #f5f9ff; }
+        .option input:checked + label { border-color: #3B73B9; background: #3B73B9; color: white; box-shadow: 0 2px 6px rgba(59,115,185,0.25); }
+
+        /* SECTION DIVIDER */
+        .section-title { margin: 28px 0 15px; padding-bottom: 9px; border-bottom: 1px solid #e5e7eb; font-size: 16px; font-weight: 600; color: #374151; }
+
+        /* ERROR */
+        .error { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 12px 14px; border-radius: 7px; margin-bottom: 20px; font-size: 14px; }
+
+        /* BUTTONS */
+        .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 25px; }
+        .button { height: 44px; padding: 0 24px; border-radius: 7px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
+        .button-primary { background: #3B73B9; color: white; }
+        .button-primary:hover { background: #3265a3; }
+        .button-secondary { background: #f3f4f6; color: #374151; }
+        .button-secondary:hover { background: #e5e7eb; }
+
+        /* MOBILE */
+        @media (max-width: 700px) {
+            .header { padding: 18px 15px; }
+            .header h1 { font-size: 21px; }
+            .container { padding: 18px 12px 40px; }
+            .card { padding: 18px; border-radius: 12px; }
+            .form-grid { grid-template-columns: 1fr; gap: 18px; }
+            .field.full { grid-column: auto; }
+            .option-group { grid-template-columns: 1fr; }
+            .option-group.two { grid-template-columns: 1fr 1fr; }
+            .actions { flex-direction: column-reverse; }
+            .button { width: 100%; }
+        }
+    </style>
+</head>
+
+<body>
+
+<header class="header">
+    <div class="header-inner">
+        <h1>New Quotation</h1>
+        <p>Enter the customer and the system requirement. The quotation is calculated automatically.</p>
+    </div>
+</header>
+
+<main class="container">
+
+    <a href="{% url 'quotation_dashboard' %}" class="back">&larr; Back to Quotations</a>
+
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+
+        <!-- =========================
+             CUSTOMER DETAILS
+        ========================= -->
+        <div class="card">
+
+            <h2 class="card-title">Customer Details</h2>
+            <p class="card-subtitle">These details are printed on the quotation PDF.</p>
+
+            <div class="form-grid">
+
+                <div class="field full">
+                    <label for="business_name">Customer / Business Name <span class="required">*</span></label>
+                    <input type="text" id="business_name" name="business_name" value="{{ posted.business_name }}"
+                           placeholder="Name printed on the quotation cover" required>
+                </div>
+
+                <div class="field">
+                    <label for="customer_name">Quotation For (person)</label>
+                    <input type="text" id="customer_name" name="customer_name" value="{{ posted.customer_name }}"
+                           placeholder="e.g. Imran" list="people-names" autocomplete="off">
+                    <datalist id="people-names">
+                        {% for name in people_names %}<option value="{{ name }}">{% endfor %}
+                    </datalist>
+                    <small style="color:#6b7280; margin-top:6px">Whose quotation is this? The dashboard adds up each person's quotations, kW, value and profit. Pick a name from the list to keep the spelling the same.</small>
+                </div>
+
+                <div class="field">
+                    <label for="phone">Phone</label>
+                    <input type="tel" id="phone" name="phone" value="{{ posted.phone }}"
+                           placeholder="Mobile number">
+                </div>
+
+                <div class="field full">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" value="{{ posted.email }}"
+                           placeholder="Optional">
+                </div>
+
+                <div class="field full">
+                    <label for="address">Address</label>
+                    <textarea id="address" name="address" placeholder="Customer address">{{ posted.address }}</textarea>
+                </div>
+
+                <div class="field full">
+                    <label for="location">Project Location <span class="required">*</span></label>
+                    <input type="text" id="location" name="location" value="{{ posted.location }}"
+                           placeholder="Where the plant will be installed" required>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- =========================
+             SYSTEM
+        ========================= -->
+        <div class="card">
+
+            <h2 class="card-title">Solar System</h2>
+            <p class="card-subtitle">Select the system requirements.</p>
+
+            <!-- PHASE -->
+            <div class="section-title" style="margin-top:0">Phase</div>
+            <div class="option-group two">
+                <div class="option">
+                    <input type="radio" id="single_phase" name="phase" value="Single Phase" required
+                           {% if posted.phase == "Single Phase" %}checked{% endif %}>
+                    <label for="single_phase">Single Phase</label>
+                </div>
+                <div class="option">
+                    <input type="radio" id="three_phase" name="phase" value="Three Phase"
+                           {% if posted.phase == "Three Phase" %}checked{% endif %}>
+                    <label for="three_phase">Three Phase</label>
+                </div>
+            </div>
+
+            <!-- SYSTEM SIZE -->
+            <div class="section-title">System Size</div>
+            <div class="field">
+                <label for="system_size">Solar System Size <span class="required">*</span></label>
+                <select id="system_size" name="system_size" required>
+                    <option value="">Select system size</option>
+                    <option value="3" {% if posted.system_size == "3" %}selected{% endif %}>3 kW</option>
+                    <option value="5" {% if posted.system_size == "5" %}selected{% endif %}>5 kW</option>
+                </select>
+            </div>
+
+            <!-- STRUCTURE -->
+            <div class="section-title">Structure</div>
+            <div class="option-group">
+                <div class="option">
+                    <input type="radio" id="roof_mounted" name="structure" value="Roof Mounted" required
+                           {% if posted.structure == "Roof Mounted" %}checked{% endif %}>
+                    <label for="roof_mounted">Roof Mounted</label>
+                </div>
+                <div class="option">
+                    <input type="radio" id="gp" name="structure" value="GP"
+                           {% if posted.structure == "GP" %}checked{% endif %}>
+                    <label for="gp">GP</label>
+                </div>
+                <div class="option">
+                    <input type="radio" id="gi" name="structure" value="GI"
+                           {% if posted.structure == "GI" %}checked{% endif %}>
+                    <label for="gi">GI</label>
+                </div>
+            </div>
+
+            <!-- SYSTEM TYPE -->
+            <div class="section-title">System Type</div>
+            <div class="option-group">
+                <div class="option">
+                    <input type="radio" id="on_grid" name="system_type" value="On-Grid" required
+                           {% if posted.system_type == "On-Grid" %}checked{% endif %}>
+                    <label for="on_grid">On-Grid</label>
+                </div>
+                <div class="option">
+                    <input type="radio" id="off_grid" name="system_type" value="Off-Grid"
+                           {% if posted.system_type == "Off-Grid" %}checked{% endif %}>
+                    <label for="off_grid">Off-Grid</label>
+                </div>
+                <div class="option">
+                    <input type="radio" id="hybrid" name="system_type" value="Hybrid"
+                           {% if posted.system_type == "Hybrid" %}checked{% endif %}>
+                    <label for="hybrid">Hybrid</label>
+                </div>
+            </div>
+
+            <!-- BUTTONS -->
+            <div class="actions">
+                <a href="{% url 'quotation_dashboard' %}" class="button button-secondary">Cancel</a>
+                <button type="submit" class="button button-primary">Continue &rarr;</button>
+            </div>
+
+        </div>
+
+    </form>
+
+</main>
+
+{% include "quotations/_pwa_register.html" %}
+
+</body>
+</html>

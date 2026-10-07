@@ -1,0 +1,16 @@
+{% load static l10n %}{% localize off %}
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+@page { size: 595.56pt 842.04pt; margin: 0; }
+{% include "quotations/pdf/_base_css.html" %}
+.f { color: #fff; font-weight: 400; line-height: 16.8pt; }
+</style></head>
+<body>
+<div class="page">
+  <img class="bg" src="{% static 'quotations/img/cover_base.jpg' %}">
+  {% for f in cover_fields %}
+  <div class="abs f" style="left:{{ f.left }}pt; top:{{ f.top }}pt; font-size:{{ f.size }}pt;">{{ f.text }}</div>
+  {% endfor %}
+</div>
+</body></html>
+{% endlocalize %}

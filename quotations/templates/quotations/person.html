@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{{ person_name }} - Dehlsen Energy</title>
+    {% include "quotations/_pwa_head.html" %}
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f7fb;
+            color: #1f2937;
+        }
+
+        .header {
+            background: #3B73B9;
+            color: white;
+            padding: 22px;
+        }
+
+        .header h1 {
+            margin: 6px 0 0;
+            font-size: 24px;
+        }
+
+        .back {
+            color: white;
+            text-decoration: none;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+            padding: 20px;
+        }
+
+        /* plain floats: the same in every browser */
+        .stats { margin: 0 -6px 16px; }
+        .stats::after, .numbers::after { content: ""; display: table; clear: both; }
+        .stat { float: left; width: 25%; padding: 0 6px 12px; }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .stat-number {
+            font-size: 22px;
+            font-weight: bold;
+            color: #3B73B9;
+            word-break: break-word;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+
+        .loss {
+            color: #b91c1c;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            margin-bottom: 6px;
+        }
+
+        .numbers {
+            margin: 12px 0 8px;
+        }
+
+        .numbers > div {
+            float: left;
+            width: 33.33%;
+            padding-right: 8px;
+        }
+
+        .numbers b {
+            display: block;
+            font-size: 16px;
+        }
+
+        .numbers small {
+            color: #6b7280;
+        }
+
+        .links a {
+            margin-right: 14px;
+            font-weight: bold;
+            text-decoration: none;
+            color: #3B73B9;
+            font-size: 14px;
+        }
+
+        @media (max-width: 640px) {
+            .stat {
+                width: 50%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <a class="back" href="{% url 'quotation_dashboard' %}">&larr; Dashboard</a>
+    <h1>{{ person_name }}</h1>
+</div>
+
+<div class="container">
+
+    <div class="stats">
+        <div class="stat"><div class="stat-card">
+            <div class="stat-number">{{ totals.count }}</div>
+            <div class="stat-label">Total quotations</div>
+        </div></div>
+        <div class="stat"><div class="stat-card">
+            <div class="stat-number">{{ totals.kw_display }}</div>
+            <div class="stat-label">Total kW</div>
+        </div></div>
+        <div class="stat"><div class="stat-card">
+            <div class="stat-number">{{ totals.value_display }}</div>
+            <div class="stat-label">Total value</div>
+        </div></div>
+        <div class="stat"><div class="stat-card">
+            <div class="stat-number {% if totals.profit_negative %}loss{% endif %}">{{ totals.profit_display }}</div>
+            <div class="stat-label">Total profit</div>
+        </div></div>
+    </div>
+
+    <h2>Quotations</h2>
+
+    {% for item in items %}
+
+        <div class="card">
+
+            <h3>{{ item.offer_no }}</h3>
+
+            <div>{{ item.business_name }}{% if item.location %} · {{ item.location }}{% endif %}</div>
+
+            <div class="numbers">
+                <div><b>{{ item.kw_display }}</b><small>kW</small></div>
+                <div><b>{{ item.value_display }}</b><small>Value</small></div>
+                <div><b class="{% if item.profit_negative %}loss{% endif %}">{{ item.profit_display }}</b><small>Profit</small></div>
+            </div>
+
+            <small>{{ item.category }} · {{ item.date }}</small>
+
+            <div class="links">
+                <a href="{% url 'quotation_detail' item.id %}">Open</a>
+                <a href="{% url 'quotation_pdf' item.id %}">PDF</a>
+            </div>
+
+        </div>
+
+    {% endfor %}
+
+</div>
+
+{% include "quotations/_pwa_register.html" %}
+
+</body>
+</html>

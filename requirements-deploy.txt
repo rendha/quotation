@@ -1,0 +1,4 @@
+# what the SERVER adds to your own requirements.txt
+gunicorn
+whitenoise
+psycopg[binary]          # only used when DATABASE_URL points to a Postgres database

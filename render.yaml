@@ -1,0 +1,27 @@
+# Render Blueprint: Render reads this file from the root of your GitHub repository and builds the whole service from it.
+# New  ->  Blueprint  ->  pick the repository  ->  Apply.
+#
+# This version keeps your SQLite database on a persistent disk.  Render disks exist only on PAID web services, which is why the plan is
+# "starter" (a free web service forgets its files every time it restarts).  For the free trial with a Postgres database, see DEPLOY.md.
+services:
+  - type: web
+    name: dehlsen-quotations
+    runtime: docker
+    plan: starter
+    region: singapore                  # the Render region nearest to India
+    healthCheckPath: /offline/         # a small public page that needs no database and no sign-in
+    disk:
+      name: data
+      mountPath: /data                 # the database lives here and survives restarts and updates
+      sizeGB: 1
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true            # Render makes a long random key and keeps it
+      - key: DJANGO_REQUIRE_LOGIN
+        value: "false"                 # test period: no sign-in.  Change to "true" in the Render dashboard to switch sign-in on
+      - key: SQLITE_PATH
+        value: /data/db.sqlite3
+      - key: DJANGO_HSTS_SECONDS
+        value: "0"
+      - key: WEB_CONCURRENCY
+        value: "1"                     # one worker: PDFs use a lot of memory

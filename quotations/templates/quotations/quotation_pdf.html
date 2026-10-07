@@ -1,0 +1,89 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+
+    <style>
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            color: #222;
+        }
+
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            position: relative;
+            page-break-after: always;
+            overflow: hidden;
+        }
+
+        .page:last-child {
+            page-break-after: auto;
+        }
+
+        .logo {
+            position: absolute;
+            top: 20mm;
+            left: 20mm;
+            width: 45mm;
+        }
+
+        .customer-name {
+            position: absolute;
+            top: 70mm;
+            left: 20mm;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <!-- PAGE 1 -->
+    <div class="page">
+
+        <img
+            src="{{ request.scheme }}://{{ request.get_host }}{% static 'quotation/logo.png' %}"
+            class="logo"
+        >
+
+        <div class="customer-name">
+            {{ customer_name }}
+        </div>
+
+    </div>
+
+
+    <!-- PAGE 2 -->
+    <div class="page">
+
+        <!-- Your page 2 design -->
+
+    </div>
+
+
+    <!-- PAGE 3 -->
+    <div class="page">
+
+        <!-- Your dynamic 19-item table -->
+        <!-- 13 dynamic values -->
+        <!-- remaining values static -->
+
+    </div>
+
+</body>
+</html>

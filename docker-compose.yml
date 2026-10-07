@@ -1,0 +1,32 @@
+# For a server of your own (VPS):   docker compose up -d --build
+# Caddy gets the HTTPS certificate by itself - you only need a domain name pointing at the server.
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SQLITE_PATH: /data/db.sqlite3
+      WEB_CONCURRENCY: "2"                 # 2 workers on a server with 2 GB of memory
+    volumes:
+      - app_data:/data                     # the database and its backups: survives rebuilds and updates
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data                   # the certificates
+      - caddy_config:/config
+
+volumes:
+  app_data:
+  caddy_data:
+  caddy_config:

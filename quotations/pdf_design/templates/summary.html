@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+@page { size: 595.56pt 842.04pt; margin: 0; }
+{% include "_base_css.html" %}
+.row  { color: #2f6db5; font-size: 9.6pt; line-height: 14pt; font-weight: 400; }
+.note { color: #2f6db5; font-size: 8pt; line-height: 12pt; font-weight: 300; }
+.term { color: #222; font-size: 9pt; font-weight: 400; }
+.bank { color: #2e75b6; font-size: 10.5pt; line-height: 14.5pt; font-weight: 500; }
+</style></head>
+<body>
+<div class="page">
+  <img class="bg" src="{{ assets }}summary_base.jpg">
+
+  {% for r in summary_rows %}{% if r.joined %}
+  <div class="abs row" style="left:64.5pt; top:{{ r.top }}pt;">{{ r.label }} {{ r.value }}</div>
+  {% else %}
+  <div class="abs row" style="left:64.5pt; top:{{ r.top }}pt;">{{ r.label }}</div>
+  <div class="abs row" style="left:170pt; top:{{ r.top }}pt;">:</div>
+  <div class="abs row" style="left:203pt; top:{{ r.top }}pt;">{{ r.value }}</div>
+  {% endif %}{% endfor %}
+  {% if refund_note %}<div class="abs note" style="left:174pt; top:222pt;">{{ refund_note }}</div>{% endif %}
+
+  <div class="abs term" style="left:61pt; top:622pt; line-height:15.5pt;">
+    {% for t in payment_terms %}<div><span style="display:inline-block; width:9pt;">&bull;</span>{{ t }}</div>{% endfor %}
+    <div style="padding-left:9pt;">{{ payment_note }}</div>
+  </div>
+
+  {% for b in bank_lines %}<div class="abs bank" style="left:70pt; top:{{ b.top }}pt;">{{ b.text }}</div>
+  {% endfor %}
+</div>
+</body></html>

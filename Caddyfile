@@ -1,0 +1,5 @@
+{$DOMAIN} {
+    encode gzip
+    header X-Robots-Tag "noindex, nofollow"      # keep the test site out of Google
+    reverse_proxy web:8000
+}

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in - Dehlsen Energy</title>
+    {% include "quotations/_pwa_head.html" %}
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, sans-serif; background: #f4f7fb; color: #1f2937; }
+        .header { background: #3B73B9; color: white; padding: 22px; }
+        .header h1 { margin: 0; font-size: 22px; }
+        .container { max-width: 420px; margin: 30px auto; padding: 0 20px; }
+        .card { background: white; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .card h2 { margin: 0 0 18px; font-size: 20px; }
+        label { display: block; font-size: 14px; font-weight: 600; margin: 14px 0 6px; color: #374151; }
+        input[type=text], input[type=password] { width: 100%; padding: 13px; border: 1px solid #d1d5db; border-radius: 9px; font-size: 16px; }
+        input:focus { outline: 2px solid #3B73B9; border-color: #3B73B9; }
+        button { width: 100%; margin-top: 22px; background: #3B73B9; color: white; border: 0; border-radius: 10px; padding: 14px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .error { background: #fee2e2; color: #991b1b; border-radius: 9px; padding: 11px 13px; margin-bottom: 6px; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Dehlsen Energy</h1>
+    <div>Quotation Generator</div>
+</div>
+
+<div class="container">
+    <div class="card">
+        <h2>Sign in</h2>
+
+        {% if form.errors %}
+            <div class="error">Wrong username or password. Please try again.</div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
+
+            <label for="id_username">Username</label>
+            <input type="text" id="id_username" name="username" autocomplete="username" autocapitalize="none" required autofocus>
+
+            <label for="id_password">Password</label>
+            <input type="password" id="id_password" name="password" autocomplete="current-password" required>
+
+            <button type="submit">Sign in</button>
+        </form>
+    </div>
+</div>
+
+{% include "quotations/_pwa_register.html" %}
+</body>
+</html>

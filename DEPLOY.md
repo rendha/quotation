@@ -296,6 +296,8 @@ Copy the data out again with the same two cmd steps, but with `dumpdata ... -o b
 
 **What you get:** your data stays in the database and does not expire (the free database is deleted after 30 days; a paid one is not). Paid databases are backed up automatically.
 
+**Always on (what `render-postgres.yaml` now asks for):** the file puts the web service on the **Starter** plan (about $7 a month), which **never sleeps**. The database is always on whatever the web plan is: only a FREE web service sleeps. To change an existing service, open it and click **Upgrade your instance** (or **Settings**, **Instance Type**) and choose Starter. Render charges by the second, so you can switch between free and Starter whenever you like. With Starter the total is about $13 a month.
+
 **What to know:**
 * The free web service **sleeps after 15 minutes** without visitors. The next visit takes about 30 to 60 seconds, and an installed phone app shows the same delay.
 * It is **very small** (512 MB, 0.1 CPU): a PDF may be slow or fail. If so, change the instance type to **Starter** in the dashboard (**Settings**, **Instance Type**).
@@ -320,6 +322,15 @@ git push
 4. **Deploy Blueprint.** The database takes a few minutes to become available, then the web service builds. In its **Logs** you should see the tables being created and `Listening at`. When it says **Live**, open the address: an empty dashboard is correct.
 
 ### B2-3. Load your existing data (rates, panels, quotations, bank details)
+
+**The easy way:** after step 2 below (your IP is allowed and you have copied the External Database URL), run this in the project folder with the venv active:
+
+```
+tools\load_data_to_render.bat
+```
+
+It saves your data, asks you to paste the address, shows you WHICH database it is about to fill and asks you to type YES, loads everything, and deletes the export. The manual steps further down do the same thing, one command at a time.
+
 The database accepts connections only from the app. To load your data from your PC you open it for **your** IP for a few minutes.
 
 1. Find your public IP address (search "what is my IP address").
@@ -446,6 +457,19 @@ rm db.sqlite3
 
 ---
 
+## Search (dashboard and person page)
+
+One more line in `quotations\urls.py`, inside `urlpatterns`:
+
+```python
+    path("search/", views.search, name="search"),
+```
+
+Until it is added the dashboard still works: the box only narrows the people cards as you type, and the **Search** button does not appear.
+
+* **Dashboard:** type to narrow the people at once; press **Search** (or Enter) to look through **all** quotations by offer number, business, person, place, phone, category or date.
+* **Person page:** type to narrow his quotations at once.
+
 ## Install it on phones (every way)
 
 * **Android (Chrome):** open the address, tap **Install app** in the dashboard header (or the menu **Install app**).
@@ -455,6 +479,21 @@ rm db.sqlite3
 On the free Render way, the first open after a pause takes about a minute.
 
 To use your own logo, replace the five PNG files in `quotations\static\quotations\icons\` with the **same names and sizes** (see the top of `tools\make_icons.py`) and raise `CACHE_VERSION` in `quotations\pwa.py` by one.
+
+## Forgot the admin password (or no admin on the live app)
+
+You do not need the old password: make a **new** admin.
+
+* **On a paid web service:** open the service, tab **Shell**, run `python manage.py createsuperuser`.
+* **From your PC (any plan):** allow your IP in the database's **PostgreSQL Inbound IP Rules**, copy its **External Database URL**, then in the project folder (venv active):
+
+```
+tools\live_manage.bat createsuperuser
+```
+
+It asks for the address (typed invisibly), shows which database it will touch and waits for YES, then asks for a username, an e-mail (may stay empty) and a password twice. To change the password of an existing admin instead: `tools\live_manage.bat changepassword YOUR_USERNAME`. Afterwards **remove your IP** from the allow list.
+
+---
 
 ## Security checklist
 

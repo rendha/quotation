@@ -16,4 +16,5 @@ urlpatterns = [
     path("manifest.webmanifest", pwa_views.manifest, name="manifest"),
     path("sw.js", pwa_views.service_worker, name="service_worker"),
     path("offline/", pwa_views.offline, name="offline"),
+    path("search/", views.search, name="search"),
 ]

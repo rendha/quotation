@@ -117,6 +117,13 @@
                 width: 50%;
             }
         }
+
+        /* SEARCH */
+        .search-form { display: flex; gap: 8px; margin-bottom: 14px; }
+        .search-form input[type=search] { flex: 1; min-width: 0; padding: 13px 14px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 16px; background: white; }
+        .search-form input[type=search]:focus { outline: 2px solid #3B73B9; border-color: #3B73B9; }
+        .search-form button { background: #3B73B9; color: white; border: 0; border-radius: 10px; padding: 0 20px; font-size: 15px; font-weight: bold; cursor: pointer; }
+        .count { color: #6b7280; font-size: 13px; margin: -4px 0 12px; min-height: 16px; }
     </style>
 </head>
 
@@ -150,9 +157,14 @@
 
     <h2>Quotations</h2>
 
+    <div class="search-form">
+        <input type="search" id="quotation-search" placeholder="Search his quotations: offer number, business, place, date" autocomplete="off" enterkeyhint="search">
+    </div>
+    <div class="count" id="quotation-count"></div>
+
     {% for item in items %}
 
-        <div class="card">
+        <div class="card" data-search="{{ item.search }}">
 
             <h3>{{ item.offer_no }}</h3>
 
@@ -176,6 +188,13 @@
     {% endfor %}
 
 </div>
+
+<div class="container">
+    <div class="card" id="quotation-empty" style="display:none">No quotation matches.</div>
+</div>
+
+{% include "quotations/_live_filter.html" %}
+<script>liveFilter("quotation-search", ".card[data-search]", "quotation-count", "quotation-empty");</script>
 
 {% include "quotations/_pwa_register.html" %}
 

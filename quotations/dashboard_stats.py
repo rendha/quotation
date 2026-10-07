@@ -52,6 +52,28 @@ def distinct_names(names):
     return sorted((most_common_name(v) for v in groups.values()), key=str.casefold)
 
 
+# ---------------------------------------------------------------------------------------------- search
+SEARCH_FIELDS = ("offer_no", "business_name", "customer_name", "location", "phone", "email", "category", "capacity", "date")
+
+
+def search_text(quotation):
+    """Everything about a quotation that a person may type to find it, as one text."""
+    return " ".join(str(getattr(quotation, name, "") or "") for name in SEARCH_FIELDS)
+
+
+def matches(text, query):
+    """True when EVERY word of the query is somewhere in the text (any order; capitals and extra spaces do not matter)."""
+    words = clean_name(query).casefold().split()
+    haystack = clean_name(text).casefold()
+    return bool(words) and all(word in haystack for word in words)
+
+
+def link_key_for(name):
+    """What the person-page link carries for this name (the same rule as people())."""
+    key = name_key(name)
+    return NO_NAME_KEY if key == "" else key
+
+
 # ---------------------------------------------------------------------------------------------- numbers
 def _decimal(value):
     if value is None or str(value).strip() == "":

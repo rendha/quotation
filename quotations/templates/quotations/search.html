@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Search - Dehlsen Energy</title>
+    {% include "quotations/_pwa_head.html" %}
+
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, sans-serif; background: #f4f7fb; color: #1f2937; }
+        .header { background: #3B73B9; color: white; padding: 22px; }
+        .header h1 { margin: 6px 0 0; font-size: 24px; }
+        .back { color: white; text-decoration: none; font-size: 14px; opacity: 0.9; }
+        .container { max-width: 900px; margin: auto; padding: 20px; }
+
+        .search-form { display: flex; gap: 8px; margin-bottom: 14px; }
+        .search-form input[type=search] { flex: 1; min-width: 0; padding: 13px 14px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 16px; background: white; }
+        .search-form input[type=search]:focus { outline: 2px solid #3B73B9; border-color: #3B73B9; }
+        .search-form button { background: #3B73B9; color: white; border: 0; border-radius: 10px; padding: 0 20px; font-size: 15px; font-weight: bold; cursor: pointer; }
+        .count { color: #6b7280; font-size: 14px; margin: 4px 0 14px; }
+
+        .card { background: white; border-radius: 12px; padding: 18px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .card h3 { margin-top: 0; margin-bottom: 6px; }
+        .card a { color: #3B73B9; }
+        .loss { color: #b91c1c; }
+        .numbers { margin: 12px 0 8px; }
+        .numbers::after { content: ""; display: table; clear: both; }
+        .numbers > div { float: left; width: 33.33%; padding-right: 8px; }
+        .numbers b { display: block; font-size: 16px; }
+        .numbers small { color: #6b7280; }
+        .links a { margin-right: 14px; font-weight: bold; text-decoration: none; font-size: 14px; }
+        .empty { text-align: center; padding: 36px 20px; color: #6b7280; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <a class="back" href="{% url 'quotation_dashboard' %}">&larr; Dashboard</a>
+    <h1>Search</h1>
+</div>
+
+<div class="container">
+
+    <form class="search-form" method="get" action="{% url 'search' %}">
+        <input type="search" name="q" value="{{ query }}" placeholder="Search a person, offer number, business or place" autocomplete="off" enterkeyhint="search" autofocus>
+        <button type="submit">Search</button>
+    </form>
+
+    <div class="count">{{ items|length }} quotation{{ items|length|pluralize }} found for &ldquo;{{ query }}&rdquo;</div>
+
+    {% for item in items %}
+
+        <div class="card">
+
+            <h3>{{ item.offer_no }}</h3>
+
+            <div>{{ item.business_name }}{% if item.location %} &middot; {{ item.location }}{% endif %}</div>
+
+            {% if person_url %}
+            <div>For:
+                <a href="{{ person_url }}?name={{ item.person_link|urlencode }}">{% if item.person_name %}{{ item.person_name }}{% else %}No name{% endif %}</a>
+            </div>
+            {% endif %}
+
+            <div class="numbers">
+                <div><b>{{ item.kw_display }}</b><small>kW</small></div>
+                <div><b>{{ item.value_display }}</b><small>Value</small></div>
+                <div><b class="{% if item.profit_negative %}loss{% endif %}">{{ item.profit_display }}</b><small>Profit</small></div>
+            </div>
+
+            <small>{{ item.category }} &middot; {{ item.date }}</small>
+
+            <div class="links">
+                <a href="{% url 'quotation_detail' item.id %}">Open</a>
+                <a href="{% url 'quotation_pdf' item.id %}">PDF</a>
+            </div>
+
+        </div>
+
+    {% empty %}
+
+        <div class="card empty">
+            No quotation matches &ldquo;{{ query }}&rdquo;.<br>
+            Try fewer words, or part of a name.
+        </div>
+
+    {% endfor %}
+
+</div>
+
+{% include "quotations/_pwa_register.html" %}
+</body>
+</html>

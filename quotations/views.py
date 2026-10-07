@@ -34,6 +34,7 @@ from .models import (
     SolarPackage,
 )
 from . import dashboard_stats as stats
+from .filenames import pdf_filename
 from .pdf_generator import build_quotation_pdf
 
 
@@ -476,7 +477,7 @@ def quotation_pdf(request, quotation_id):
     return FileResponse(
         pdf_buffer,
         as_attachment=False,
-        filename=f"{quotation.offer_no}.pdf",
+        filename=pdf_filename(quotation),                       # HUDA_3kW.pdf
         content_type="application/pdf",
     )
 
@@ -518,7 +519,8 @@ def person_dashboard(request):
         line = stats.format_summary(stats.summarize(stats.rows_of([q])))
         items.append({"id": q.id, "offer_no": q.offer_no, "business_name": q.business_name, "location": q.location, "date": q.date,
                       "category": q.category, "kw_display": line["kw_display"], "value_display": line["value_display"],
-                      "profit_display": line["profit_display"], "profit_negative": line["profit_negative"]})
+                      "profit_display": line["profit_display"], "profit_negative": line["profit_negative"],
+                      "search": stats.search_text(q) + " " + line["value_text"] + " " + line["kw_text"]})
 
     return render(request, "quotations/person.html", {
         "person_name": stats.most_common_name(q.customer_name for q in quotations) or stats.NO_NAME_TEXT,
@@ -527,3 +529,19 @@ def person_dashboard(request):
     })
 
 
+def search(request):
+    """Looks through ALL quotations: offer number, business, person, place, phone ...   /search/?q=huda kozhikode"""
+    query = request.GET.get("q", "").strip()
+    if not query:
+        return redirect("quotation_dashboard")
+
+    found = [q for q in Quotation.objects.order_by("-created_at") if stats.matches(stats.search_text(q), query)]
+    items = []
+    for q in found:
+        line = stats.format_summary(stats.summarize(stats.rows_of([q])))
+        items.append({"id": q.id, "offer_no": q.offer_no, "business_name": q.business_name, "location": q.location, "date": q.date,
+                      "category": q.category, "person_name": q.customer_name, "person_link": stats.link_key_for(q.customer_name),
+                      "kw_display": line["kw_display"], "value_display": line["value_display"],
+                      "profit_display": line["profit_display"], "profit_negative": line["profit_negative"]})
+
+    return render(request, "quotations/search.html", {"query": query, "items": items, "person_url": _person_url()})

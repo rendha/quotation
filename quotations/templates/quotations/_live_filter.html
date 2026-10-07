@@ -1,0 +1,35 @@
+<script>
+/* Live search.  Shows only the items whose text contains EVERY word typed (any order, capitals do not matter).
+   liveFilter(inputId, itemSelector, countId, emptyId): the items carry their text in a data-search attribute. */
+function searchMatches(text, query) {
+    var words = String(query || "").toLowerCase().split(/\s+/).filter(Boolean);
+    var haystack = String(text || "").toLowerCase();
+    for (var i = 0; i < words.length; i++) {
+        if (haystack.indexOf(words[i]) === -1) { return false; }
+    }
+    return true;
+}
+
+function liveFilter(inputId, itemSelector, countId, emptyId) {
+    var input = document.getElementById(inputId);
+    if (!input) { return; }
+    var items = document.querySelectorAll(itemSelector);
+    var countBox = countId ? document.getElementById(countId) : null;
+    var emptyBox = emptyId ? document.getElementById(emptyId) : null;
+
+    function apply() {
+        var typed = String(input.value || "").trim() !== "";
+        var shown = 0;
+        for (var i = 0; i < items.length; i++) {
+            var ok = searchMatches(items[i].getAttribute("data-search"), input.value);
+            items[i].style.display = ok ? "" : "none";
+            if (ok) { shown++; }
+        }
+        if (countBox) { countBox.textContent = typed ? "Showing " + shown + " of " + items.length : ""; }
+        if (emptyBox) { emptyBox.style.display = (typed && shown === 0) ? "block" : "none"; }
+    }
+
+    input.addEventListener("input", apply);
+    apply();
+}
+</script>

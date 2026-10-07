@@ -48,7 +48,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='quotation',
             name='loading_charge',
-            field=models.DecimalField(decimal_places=12, default=1000, max_digits=12),
+            field=models.DecimalField(decimal_places=2, default=1000, max_digits=12),
         ),
         migrations.AddField(
             model_name='quotation',

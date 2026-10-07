@@ -478,4 +478,6 @@ To use your own logo, replace the five PNG files in `quotations\static\quotation
 | PDF gives an error 500 or the page never finishes (free instance) | The free instance is too small for PDFs. Look at the Logs; use way A |
 | PDF has no background picture or the wrong font | A file name differs in capitals: run `py tools\check_assets.py` on your PC |
 | A phone keeps showing an old version | Raise `CACHE_VERSION` in `quotations\pwa.py`, deploy again |
+| `Connection refused` ... `port 5432` in the logs (way B2) | The database was not ready yet, or the service points to the wrong one. The start script now waits up to 3 minutes ("Waiting for the database ..."). If it still fails: is the database **Available**? Is the service's `DATABASE_URL` the **Internal** URL of the right database (`quotation-db`, not an older one)? |
+| `numeric field overflow` ... `precision 12, scale 12` (way B2) | A decimal field with as many decimal places as digits only holds values below 1. Run `py tools\check_decimal_fields.py`; it names the migration to fix |
 | Sign-in page appears when you expected none | `DJANGO_REQUIRE_LOGIN` is `true` or missing (the default is true). Set it to `false` |

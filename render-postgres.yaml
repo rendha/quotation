@@ -1,10 +1,12 @@
 # Render Blueprint: a FREE web service + a PAID Postgres database (the data does not expire and has automatic backups).
+# The names (quotation-db, quotation-app) are NEW on purpose: never reuse the name of something that already exists in your workspace,
+# because a Blueprint can change an existing resource that has the same name.
 # Use it instead of render.yaml:  New > Blueprint > ... > "Blueprint Path"  ->  render-postgres.yaml
 #
 # The web service is free: it sleeps after 15 minutes without visitors (the next visit takes 30-60 seconds) and is very small.
 # To make it always-on and bigger, change  plan: free  to  plan: starter  below and push the change.
 databases:
-  - name: dehlsen-db
+  - name: quotation-db
     plan: basic-256mb                 # a paid plan: no 30-day expiry, point-in-time recovery
     region: singapore                 # the same region as the web service
     databaseName: quotations
@@ -14,7 +16,7 @@ databases:
 
 services:
   - type: web
-    name: dehlsen-quotations
+    name: quotation-app
     runtime: docker
     plan: free
     region: singapore
@@ -22,7 +24,7 @@ services:
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: dehlsen-db
+          name: quotation-db
           property: connectionString  # the INTERNAL address: Render fills it in
       - key: DJANGO_SECRET_KEY
         generateValue: true

@@ -242,7 +242,7 @@ Read the table at the top first: the database is **deleted 30 days after you cre
 
 ### B1. The database
 
-Render dashboard: **New**, **PostgreSQL**. Name `dehlsen-db`, region **Singapore**, plan **Free**, create. When it is ready, open it and copy the **Internal Database URL** (and, for step B3, the **External Database URL**).
+Render dashboard: **New**, **PostgreSQL**. Name `quotation-db`, region **Singapore**, plan **Free**, create. When it is ready, open it and copy the **Internal Database URL** (and, for step B3, the **External Database URL**).
 
 ### B2. The web service (no blueprint: do not use `render.yaml` for this way)
 
@@ -302,6 +302,8 @@ Copy the data out again with the same two cmd steps, but with `dumpdata ... -o b
 * Free web services share **750 free hours per workspace per month**. If another free service of yours is already running, check the **Dashboard** first.
 * Your app has run on SQLite until now. It has **not been tested on Postgres**, so test a quotation and a PDF before you rely on it.
 
+**Before you create anything: names.** A Blueprint can change an existing resource that has the same name, even a database that holds data. This file uses the names `quotation-db` and `quotation-app`. Open your Render **Dashboard** and make sure nothing you already have uses those names. If something does, change the names in `render-postgres.yaml` (in the database, in the service, and in the `fromDatabase` line) before you create the Blueprint. Never reuse the name of a database that holds data.
+
 ### B2-1. Put the file in the repository
 `render-postgres.yaml` goes in the project folder (next to `render.yaml`). Push it (the repository is public at this moment, as planned):
 
@@ -321,7 +323,7 @@ git push
 The database accepts connections only from the app. To load your data from your PC you open it for **your** IP for a few minutes.
 
 1. Find your public IP address (search "what is my IP address").
-2. Open the database `dehlsen-db` in Render and find its **access control / allowed IPs** setting. Add `YOUR.IP.ADDRESS/32` with any description. Menu names may differ a little: look for the IP allow list.
+2. Open the database `quotation-db` in Render and find its **access control / allowed IPs** setting. Add `YOUR.IP.ADDRESS/32` with any description. Menu names may differ a little: look for the IP allow list.
 3. On the same page copy the **External Database URL**.
 4. On your PC (cmd, venv active). **First** save your data, with no `DATABASE_URL` set yet, so it reads your local database:
 

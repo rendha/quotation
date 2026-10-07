@@ -1,0 +1,34 @@
+# Render Blueprint: a FREE web service + a PAID Postgres database (the data does not expire and has automatic backups).
+# Use it instead of render.yaml:  New > Blueprint > ... > "Blueprint Path"  ->  render-postgres.yaml
+#
+# The web service is free: it sleeps after 15 minutes without visitors (the next visit takes 30-60 seconds) and is very small.
+# To make it always-on and bigger, change  plan: free  to  plan: starter  below and push the change.
+databases:
+  - name: dehlsen-db
+    plan: basic-256mb                 # a paid plan: no 30-day expiry, point-in-time recovery
+    region: singapore                 # the same region as the web service
+    databaseName: quotations
+    user: quotations_user
+    diskSizeGB: 1                     # storage costs $0.30 per GB per month
+    ipAllowList: []                   # only the app (inside Render) may connect. To load your data from your PC, add your IP in the dashboard, then remove it
+
+services:
+  - type: web
+    name: dehlsen-quotations
+    runtime: docker
+    plan: free
+    region: singapore
+    healthCheckPath: /offline/        # a small public page that needs no database and no sign-in
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dehlsen-db
+          property: connectionString  # the INTERNAL address: Render fills it in
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_REQUIRE_LOGIN
+        value: "false"                # test period: no sign-in.  Change to "true" in the Render dashboard to switch sign-in on
+      - key: DJANGO_HSTS_SECONDS
+        value: "0"
+      - key: WEB_CONCURRENCY
+        value: "1"                    # one worker: PDFs use a lot of memory

@@ -23,6 +23,8 @@ Your database is **one SQLite file**. Render's rules decide where it can live:
 | Set-up | One click from GitHub (Blueprint) | A few clicks, no blueprint | Most work |
 | Best for | Real use | A short trial this week | Full control |
 
+**Way B2 (free web service + a PAID Render database)** costs about the same as way A (roughly $6.30 a month for the smallest paid database, plus nothing for the web service). Your data sits in Postgres with automatic backups (a 3-day point-in-time recovery on the Hobby workspace) and never expires. The web service is the free one: it sleeps after 15 minutes idle and is very small, so PDFs may be slow. See "Way B2" below.
+
 **Way D (Railway)** is the same idea as Way A on a different platform: it deploys from GitHub, uses the same `Dockerfile`, and keeps the database on a volume. It costs about **$5 a month at least** (usage-based), has a 30-day trial, and works with a **private** repository when you sign in to Railway as the GitHub account that owns the repository. See "Way D" below.
 
 A free Render web service **cannot** keep your SQLite file: free services lose their local files every time they restart, redeploy or go to sleep, so everything your testers enter would disappear. Disks exist only on paid services. That is why B uses Postgres.
@@ -285,6 +287,68 @@ Close that cmd window afterwards (the settings you typed there only lived in it)
 ### B4. Before the 30 days end
 
 Copy the data out again with the same two cmd steps, but with `dumpdata ... -o backup.json` while `DATABASE_URL` is the External URL. Then either upgrade the database to a paid plan in Render, or move to way A.
+
+---
+
+## Way B2: Render free web service + PAID Postgres (`render-postgres.yaml`)
+
+**Cost (Render's published prices, mid-2026; check render.com/pricing):** the smallest paid database, Basic-256mb, is about **$6 a month** plus **$0.30 per GB** of storage (this file asks for 1 GB). The free web service costs nothing. With the Hobby workspace you have now, that is about **$6.30 a month**.
+
+**What you get:** your data stays in the database and does not expire (the free database is deleted after 30 days; a paid one is not). Paid databases are backed up automatically.
+
+**What to know:**
+* The free web service **sleeps after 15 minutes** without visitors. The next visit takes about 30 to 60 seconds, and an installed phone app shows the same delay.
+* It is **very small** (512 MB, 0.1 CPU): a PDF may be slow or fail. If so, change the instance type to **Starter** in the dashboard (**Settings**, **Instance Type**).
+* Free web services share **750 free hours per workspace per month**. If another free service of yours is already running, check the **Dashboard** first.
+* Your app has run on SQLite until now. It has **not been tested on Postgres**, so test a quotation and a PDF before you rely on it.
+
+### B2-1. Put the file in the repository
+`render-postgres.yaml` goes in the project folder (next to `render.yaml`). Push it (the repository is public at this moment, as planned):
+
+```
+git add -A
+git commit -m "render blueprint with a paid database"
+git push
+```
+
+### B2-2. Create both from the blueprint
+1. Render: **New**, **Blueprint**, then paste `https://github.com/rendha/quotation` in **Public Git Repository**.
+2. **Blueprint Name:** anything. **Branch:** `main`. **Blueprint Path:** type **`render-postgres.yaml`**.
+3. The review list must show **a web service (Free)** and **a database (Basic-256mb)**. If it shows a Starter service, you left the path empty: fix the path.
+4. **Deploy Blueprint.** The database takes a few minutes to become available, then the web service builds. In its **Logs** you should see the tables being created and `Listening at`. When it says **Live**, open the address: an empty dashboard is correct.
+
+### B2-3. Load your existing data (rates, panels, quotations, bank details)
+The database accepts connections only from the app. To load your data from your PC you open it for **your** IP for a few minutes.
+
+1. Find your public IP address (search "what is my IP address").
+2. Open the database `dehlsen-db` in Render and find its **access control / allowed IPs** setting. Add `YOUR.IP.ADDRESS/32` with any description. Menu names may differ a little: look for the IP allow list.
+3. On the same page copy the **External Database URL**.
+4. On your PC (cmd, venv active). **First** save your data, with no `DATABASE_URL` set yet, so it reads your local database:
+
+```
+set PYTHONUTF8=1
+pip install "psycopg[binary]"
+py manage.py dumpdata --natural-foreign --natural-primary -e contenttypes -e auth.permission -e admin.logentry -e sessions -o data.json
+```
+
+5. **Then** point the same project at the new database and load the file:
+
+```
+set DATABASE_URL=PASTE_THE_EXTERNAL_URL_HERE
+set DJANGO_SETTINGS_MODULE=quotation_pwa.settings_production
+set DJANGO_SECRET_KEY=any-long-text-of-at-least-32-characters-please
+set DJANGO_ALLOWED_HOSTS=localhost
+py manage.py migrate
+py manage.py loaddata data.json
+```
+
+6. **Clean up:** close that cmd window, delete the export (`del data.json`, it holds customer details), and **remove your IP** from the database's allow list.
+7. Refresh the app. The dashboard shows your quotations. Open a quotation PDF and check that the last page shows the bank lines.
+
+### B2-4. After the first deploy
+* Make the repository **private** again once the web service is Live.
+* Later changes (a new `git push`) need the repository public for the moment you press **Manual Deploy**, as described for way A.
+* To switch sign-in on, set `DJANGO_REQUIRE_LOGIN` to `true` in the service's **Environment** (while the repository is public: this redeploys).
 
 ---
 

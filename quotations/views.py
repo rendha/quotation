@@ -18,6 +18,7 @@ from .calculations import (
     PANEL_SHORTFALL_ALLOWED_PERCENT,
     calculate_panel_quantity,
     parse_manual_panels,
+    parse_structure_kw,
     calculate_quotation,
     clean_text,
     decimal_or_zero,
@@ -382,8 +383,14 @@ def quotation_detail(request, quotation_id):
             apply_product_to_item(ac_wire_item, ac_wire, category="ac_wire")
         quotation.ac_wire_quantity = _quantity_from_post(request, "ac_wire_quantity", quotation.ac_wire_quantity)
 
-        # ---- earth: editable quantity (the product itself is chosen through the BOS options) ----
-        quotation.earth_quantity = _quantity_from_post(request, "earth_quantity", quotation.earth_quantity)
+        # ---- earth rods: always 3 nos (set by calculate_quotation), nothing to read here ----
+
+        # ---- structure kW: empty = the panels' total watts; a number (8) = that many kW (8,000 W) for the structure ----
+        if _model_has_field(Quotation, "structure_kw_manual"):
+            structure_kw, problem = parse_structure_kw(request.POST.get("structure_kw_manual"))
+            if problem:
+                return HttpResponseBadRequest(problem)
+            quotation.structure_kw_manual = structure_kw
 
         # ---- structure height ----
         structure_height = clean_text(request.POST.get("structure_height"))
@@ -454,6 +461,7 @@ def quotation_detail(request, quotation_id):
             "other_inverter_rate": plain_number(quotation.inverter_rate) if is_other_inverter else "",
             "panel_shortfall_percent": PANEL_SHORTFALL_ALLOWED_PERCENT,          # the page's live panel count uses the same rule
             "can_edit_panels": _model_has_field(Quotation, "panel_quantity_manual"),
+            "can_edit_structure_kw": _model_has_field(Quotation, "structure_kw_manual"),
             "people_names": _people_names(),
         },
     )
@@ -474,12 +482,16 @@ def quotation_pdf(request, quotation_id):
 
     pdf_buffer = build_quotation_pdf(request, quotation)
 
-    return FileResponse(
+    response = FileResponse(
         pdf_buffer,
         as_attachment=False,
         filename=pdf_filename(quotation),                       # HUDA_3kW.pdf
         content_type="application/pdf",
     )
+    # never reuse an earlier copy: the PDF must always show the current saved quotation
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    return response
 
 
 # =========================================================

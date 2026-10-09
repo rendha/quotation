@@ -725,6 +725,12 @@ class Quotation(models.Model):
         decimal_places=2,
         default=Decimal("0"),
     )
+    structure_kw_manual = models.DecimalField(
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
 
     structure_total = models.DecimalField(
         max_digits=14,

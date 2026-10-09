@@ -13,12 +13,14 @@ and before every PDF; views.py, the templates and the PDF generator never calcul
                              A number typed in on the quotation (panel_quantity_manual) replaces the calculated count.
         inverter ........... the selected inverter's rate (default: the one matching kW and phase)    (rate sheet)
         DC cable, AC wire .. selected product's rate per metre x the length entered                   (rate sheet)
-        earth rod .......... rate x the quantity entered                                              (rate sheet)
+        earth rod .......... rate x EARTH_ROD_QUANTITY (fixed 3 nos)                                  (rate sheet)
         ACDB, DCDB, meter box, UG cable, earthing cable, arrester, energy meter, net meter ... by phase  (rate sheet)
-        structure material . feet x panel watts      roof 2 ft | GP selected height | GI selected height + 2 ft
-        structure wage ..... wage factor x panel watts   factor 3 for 3-4 kW, 2.5 for 5 kW and above (calculated, not fixed;
+        structure material . feet x STRUCTURE WATTS  roof 2 ft | GP selected height | GI selected height + 2 ft
+        structure wage ..... wage factor x STRUCTURE WATTS   factor 3 for 3-4 kW, 2.5 for 5 kW and above (calculated, not fixed;
                              a wage typed in by hand on the quotation replaces it)
-      + BOS ................ ONE predefined amount (BOS_FIXED_AMOUNT)
+                             STRUCTURE WATTS = the total panel watts, unless a structure kW is typed on the quotation
+                             (structure_kw_manual: 8 -> 8,000 W).
+      + BOS ................ ONE predefined amount that depends on the plant size and phase (BOS_AMOUNTS)
       + the prefixed non-taxable charges (fields of the quotation; a new quotation starts with the amounts set in views.py:
             electrical work 8,000, transportation / travel 2,000, KSEB fee 4,720, loading 1,000, documentation 2,500)
     SELLING PRICE = TOTAL COST / margin factor x 100      the costing sheet's "Cost+Margine": the cost is `factor` % of the price
@@ -69,7 +71,21 @@ MANUAL_PANELS_WARN_PERCENT = Decimal("20")
 
 # Predefined BOS (balance of system) amount added ONCE to every quotation's cost.
 # It replaces the individual BOS rows (sockets, glands, clamps ...), which are never added.
+# The amount depends on the plant size (kW) and the phase:  3 kW 10,000 | 5 kW 1-phase 12,000 | 5 kW 3-phase 15,000 | 8 kW 15,000.
+# key = (kW, "1PH" / "3PH" / None);  None = any phase.  A size that is not listed uses BOS_FIXED_AMOUNT.
+BOS_AMOUNTS = {
+    (Decimal("3"), None): Decimal("10000"),
+    (Decimal("5"), "1PH"): Decimal("12000"),
+    (Decimal("5"), "3PH"): Decimal("15000"),
+    (Decimal("8"), None): Decimal("15000"),
+}
 BOS_FIXED_AMOUNT = Decimal("10000")
+
+# Earth rods are always 3 nos (no box on the page any more).
+EARTH_ROD_QUANTITY = Decimal("3")
+
+# A structure kW typed on the quotation (8 -> 8,000 W) replaces the panels' total watts in the structure calculation.
+MAX_STRUCTURE_KW = Decimal("100")
 
 DEFAULT_STRUCTURE_FACTOR_3_4 = Decimal("3")        # structure wage: Rs per watt for 3 kW and 4 kW systems
 DEFAULT_STRUCTURE_FACTOR_5_PLUS = Decimal("2.5")   # ... and for 5 kW and above (both editable in StructureWageSetting)
@@ -136,6 +152,32 @@ def plain_number(value):
     if d == d.to_integral_value():
         return str(int(d))
     return format(d.normalize(), "f")
+
+
+def bos_amount_for(system_size, phase_token):
+    """BOS amount for a plant: (size, phase) first, then (size, any phase), then BOS_FIXED_AMOUNT."""
+    size = decimal_or_zero(system_size)
+    for key in ((size, phase_token), (size, None)):
+        if key in BOS_AMOUNTS:
+            return BOS_AMOUNTS[key]
+    return BOS_FIXED_AMOUNT
+
+
+def parse_structure_kw(raw):
+    """
+    What was typed in the "Structure kW" box -> (Decimal kW or None, problem text).
+    Empty = None: the structure uses the panels' total watts.  Otherwise a number above 0 and up to MAX_STRUCTURE_KW.
+    """
+    text = clean_text(raw)
+    if text == "":
+        return None, ""
+    try:
+        number = Decimal(text)
+    except (InvalidOperation, ValueError):
+        return None, "The structure kW must be a number."
+    if not number.is_finite() or number <= 0 or number > MAX_STRUCTURE_KW:
+        return None, "The structure kW must be more than 0 and not more than %s." % plain_number(MAX_STRUCTURE_KW)
+    return number, ""
 
 
 def structure_kind(value):
@@ -252,11 +294,12 @@ def get_structure_wage_factor(system_size):
     return setting.factor if setting.is_active else default_factor
 
 
-def calculate_structure(quotation, panel_watt_total):
+def calculate_structure(quotation, structure_watts):
     """
     -> (material cost, calculated wage, wage factor, feet)
-    material = feet x panel watts       roof 2 ft | GP selected height | GI selected height + 2 ft (no height selected -> 0)
-    wage     = wage factor x panel watts
+    material = feet x structure watts   roof 2 ft | GP selected height | GI selected height + 2 ft (no height selected -> 0)
+    wage     = wage factor x structure watts
+    structure watts = the panels' total watts, or the structure kW typed on the quotation x 1,000
     """
     wage_factor = get_structure_wage_factor(quotation.system_size)
     kind = structure_kind(quotation.structure_type)
@@ -271,8 +314,8 @@ def calculate_structure(quotation, panel_watt_total):
     else:
         feet = ZERO
 
-    if panel_watt_total > 0:
-        return money(feet * panel_watt_total), money(wage_factor * panel_watt_total), wage_factor, feet
+    if structure_watts > 0:
+        return money(feet * structure_watts), money(wage_factor * structure_watts), wage_factor, feet
     return ZERO, ZERO, wage_factor, feet
 
 
@@ -359,7 +402,7 @@ def rate_sheet_requirements():
     for key, label, category, prefix, by_phase, quantity in RATE_SHEET_COMPONENTS:
         if not by_phase:
             rows.append({"label": label, "category": category, "product": find_product(category, prefix=prefix)})
-    for token, sizes in (("1PH", (3, 5)), ("3PH", (5,))):                  # the combinations that are sold: 3 and 5 kW single phase, 5 kW three phase
+    for token, sizes in (("1PH", (3, 5, 8)), ("3PH", (5, 8))):             # the combinations that are sold: 3, 5 and 8 kW single phase, 5 and 8 kW three phase
         for kw in sizes:
             rows.append({"label": "Inverter %s kW %s" % (kw, token), "category": "inverter",
                          "product": find_product("inverter", capacity=Decimal(kw), contains=(token,))})
@@ -483,6 +526,8 @@ def _compute(quotation):
         inverter = find_product("inverter", name=selected["inverter_type"]) if selected["inverter_type"] else None
         if inverter is None:
             inverter = find_product("inverter", capacity=inverter_kw, contains=(token,))
+            if inverter is None:                                                     # e.g. an inverter whose name does not say the phase
+                inverter = find_product("inverter", capacity=inverter_kw)
             if selected["inverter_type"] and inverter is not None:
                 warnings.append("Inverter '%s' is not in the rate sheet; %s was used instead." % (selected["inverter_type"], inverter.name))
         price("inverter", "Inverter", inverter, 1,
@@ -515,7 +560,7 @@ def _compute(quotation):
     price("ac_wire", "AC wire", ac_wire, decimal_or_zero(quotation.ac_wire_quantity),
           "No AC wire rate found (4 SQMM FR Copper). Add it in Admin > Products (category ac_wire).", "m")
 
-    price("earth_rod", "Earth rod", find_product("earthing", prefix="EARTH ROD"), decimal_or_zero(quotation.earth_quantity),
+    price("earth_rod", "Earth rod", find_product("earthing", prefix="EARTH ROD"), EARTH_ROD_QUANTITY,
           "No earth rod rate found. Add it in Admin > Products (category earthing, name starting EARTH ROD).")
 
     for key, label, category, prefix, by_phase, quantity in RATE_SHEET_COMPONENTS:
@@ -536,10 +581,14 @@ def _compute(quotation):
               (label.lower(), " for %s" % token if by_phase else "", category, prefix), unit)
 
     components_total = money(sum((c["amount"] for c in components.values()), ZERO))
-    bos_amount = money(BOS_FIXED_AMOUNT)
+    bos_amount = money(bos_amount_for(quotation.system_size, token))
 
     # ---- 9-10. STRUCTURE: material, then wage (a hand-entered wage replaces the calculated one) ---------
-    structure_material, calculated_wage, wage_factor, feet = calculate_structure(quotation, panel_total_watt)
+    # structure watts = the panels' total watts, unless a structure kW was typed (8 -> 8,000 W)
+    structure_kw_manual = decimal_or_zero(getattr(quotation, "structure_kw_manual", None))
+    structure_is_manual = structure_kw_manual > 0
+    structure_watts = structure_kw_manual * Decimal("1000") if structure_is_manual else panel_total_watt
+    structure_material, calculated_wage, wage_factor, feet = calculate_structure(quotation, structure_watts)
 
     stored_work = Decimal(quotation.structure_work or 0)
     previous_calculated_wage = Decimal(quotation.structure_wage or 0)
@@ -554,14 +603,14 @@ def _compute(quotation):
         _line("loading_charge", "Loading charge", decimal_or_zero(quotation.loading_charge)),
         _line("documentation", "Documentation", decimal_or_zero(quotation.documentation)),
     ]
-    structure_note = "%s ft x %s W" % (plain_number(feet), plain_number(panel_total_watt))
+    structure_note = "%s ft x %s W%s" % (plain_number(feet), plain_number(structure_watts), " (structure kW entered by hand)" if structure_is_manual else "")
 
     # ---- 12. TOTAL COST = the selection (with the structure and its wage) + BOS + the prefixed non-taxables ----
     lines = [_line("panel", "Solar panels", panel_value, panel_note)] + lines_components + [
         _line("structure_material", "Structure material", structure_material, structure_note),
         _line("structure_work", "Structure wage", structure_work,
-              "entered by hand" if wage_is_manual else "Rs %s per watt x %s W" % (plain_number(wage_factor), plain_number(panel_total_watt))),
-        _line("bos", "BOS total (fixed)", bos_amount),
+              "entered by hand" if wage_is_manual else "Rs %s per watt x %s W" % (plain_number(wage_factor), plain_number(structure_watts))),
+        _line("bos", "BOS total (fixed for %s kW)" % plain_number(decimal_or_zero(quotation.system_size)), bos_amount),
     ] + charge_lines
     calculated_cost = money(sum((l["amount"] for l in lines), ZERO))
 
@@ -605,6 +654,7 @@ def _compute(quotation):
         "panel_total_watt": panel_total_watt, "panel_value": panel_value,
         "panel_tax_amount": panel_tax_display,
         "components_total": components_total, "bos_amount": bos_amount, "structure_note": structure_note,
+        "structure_watts": structure_watts, "structure_watts_auto": panel_total_watt, "structure_is_manual": structure_is_manual,
         "inverter_kw": inverter_kw,
         "structure_cost": structure_material, "structure_wage_factor": wage_factor,
         "calculated_structure_wage": calculated_wage, "structure_work": structure_work, "wage_is_manual": wage_is_manual,
@@ -647,6 +697,8 @@ def calculate_quotation(quotation):
     quotation.panel_base_amount = r["panel_value"]
     quotation.panel_tax_amount = r["panel_tax_amount"]          # for display only: never added to the price
     quotation.panel_total_amount = r["panel_value"]
+
+    quotation.earth_quantity = EARTH_ROD_QUANTITY               # always 3 nos (the PDF prints this)
 
     # ---- structure ----
     quotation.structure_cost = r["structure_cost"]

@@ -263,7 +263,8 @@
                     <option value="">Select Inverter KW</option>
                     <option value="3" {% if quotation.inverter_kw|floatformat:"-2" == "3" %}selected{% endif %}>3 kW</option>
                     <option value="5" {% if quotation.inverter_kw|floatformat:"-2" == "5" %}selected{% endif %}>5 kW</option>
-                    {% if quotation.inverter_kw and quotation.inverter_kw|floatformat:"-2" != "3" and quotation.inverter_kw|floatformat:"-2" != "5" %}
+                    <option value="8" {% if quotation.inverter_kw|floatformat:"-2" == "8" %}selected{% endif %}>8 kW</option>
+                    {% if quotation.inverter_kw and quotation.inverter_kw|floatformat:"-2" != "3" and quotation.inverter_kw|floatformat:"-2" != "5" and quotation.inverter_kw|floatformat:"-2" != "8" %}
                         <option value="{{ quotation.inverter_kw|floatformat:"-2" }}" selected>{{ quotation.inverter_kw|floatformat:"-2" }} kW (saved)</option>
                     {% endif %}
                 </select>
@@ -363,22 +364,6 @@
 
 
     <!-- =================================================
-         EARTH
-    ================================================= -->
-    <div class="card">
-        <h2 class="card-title">Earth / Earthing</h2>
-
-        <div class="form-grid">
-            <div class="field">
-                <label for="earth_quantity">Earth Quantity (nos)</label>
-                <input type="number" id="earth_quantity" name="earth_quantity" value="{{ quotation.earth_quantity|floatformat:"-2" }}" step="0.01" min="0">
-            </div>
-        </div>
-        <div class="card-note" style="margin-top:12px">Earth rods are priced at the rate-sheet rate &times; this quantity.</div>
-    </div>
-
-
-    <!-- =================================================
          STRUCTURE
     ================================================= -->
     <div class="card">
@@ -411,6 +396,23 @@
                 </div>
             </div>
         {% endif %}
+
+        <div class="form-grid" style="margin-top:18px">
+            <div class="field">
+                <label>Structure watts <span class="hint">(total panel watts; the structure cost is worked out on this)</span></label>
+                <input type="text" id="structure-watts" value="{{ summary.structure_watts|floatformat:'-2' }} W" readonly>
+                <div class="hint panel-note">Calculated from the panels: <strong id="structure-auto-watts">{{ summary.structure_watts_auto|floatformat:"-2" }}</strong> W
+                    {% if summary.structure_is_manual %}&nbsp;&middot;&nbsp;<span class="manual-badge">structure set by hand: {{ quotation.structure_kw_manual|floatformat:"-2" }} kW = {{ summary.structure_watts|floatformat:"-2" }} W</span>{% endif %}</div>
+            </div>
+            {% if can_edit_structure_kw %}
+            <div class="field">
+                <label for="structure_kw_manual">Structure kW <span class="hint">(optional &mdash; type 8 to calculate the structure on 8,000 W; empty = use the panel watts)</span></label>
+                <input type="number" min="0.1" max="100" step="0.01" id="structure_kw_manual" name="structure_kw_manual"
+                       value="{{ quotation.structure_kw_manual|default_if_none:''|floatformat:'-2' }}" placeholder="empty = automatic" oninput="updateStructureWatts()">
+                {% if summary.structure_is_manual %}<div class="hint panel-note">Empty the box and save to go back to the panel watts.</div>{% endif %}
+            </div>
+            {% endif %}
+        </div>
 
         <div class="structure-calculation">
             <div class="structure-row"><div class="structure-label">Structure Wage Factor (&#8377; per watt)</div><div class="structure-value">{{ quotation.structure_wage_factor|floatformat:"-2" }}</div></div>
@@ -529,7 +531,8 @@
         <div class="actions">
             <a href="{% url 'quotation_dashboard' %}" class="back">&larr; Back to Quotations</a>
             <button type="submit" class="primary-button">Save &amp; Recalculate</button>
-            <a href="{% url 'quotation_pdf' quotation.id %}" class="pdf-button" target="_blank">Open PDF</a>
+            <a href="{% url 'quotation_pdf' quotation.id %}" class="pdf-button" target="_blank"
+               onclick="this.href='{% url 'quotation_pdf' quotation.id %}?t='+Date.now();">Open PDF</a>
         </div>
     </div>
 
@@ -592,10 +595,37 @@ function calculatePanelQuantity() {
     const requiredWatts = Math.round(systemSize * 1000);
     const nearest = Math.floor((2 * requiredWatts + wattage) / (2 * wattage));
     const smallestAllowed = Math.ceil(Number((requiredWatts * (100 - shortfallPercent) / 100 / wattage).toFixed(6)));
-    show(Math.max(1, nearest, smallestAllowed));
+    const count = Math.max(1, nearest, smallestAllowed);
+    show(count);
+    window.autoPanelWatts = count * wattage;
+    updateStructureWatts();
+}
+
+/* STRUCTURE WATTS - display only.  The typed structure kW (x 1000) wins, otherwise the panels' total watts.
+   The server calculates the real amount when you press Save & Recalculate. */
+function updateStructureWatts() {
+    const box = document.getElementById("structure-watts");
+    const kw = document.getElementById("structure_kw_manual");
+    const auto = document.getElementById("structure-auto-watts");
+    if (!box) { return; }
+
+    let panelWatts = Number.isFinite(window.autoPanelWatts) ? window.autoPanelWatts : parseFloat("{{ summary.structure_watts_auto|floatformat:'2'|cut:',' }}") || 0;
+    const manualPanels = document.getElementById("panel_quantity_manual");
+    const selected = document.getElementById("panel_option");
+    if (manualPanels && manualPanels.value && selected && selected.selectedIndex > 0) {
+        const wattage = parseFloat(selected.options[selected.selectedIndex].dataset.wattage);
+        if (Number.isFinite(wattage)) { panelWatts = parseFloat(manualPanels.value) * wattage; }
+    }
+    if (auto) { auto.textContent = String(Math.round(panelWatts * 100) / 100); }
+
+    const typed = kw ? parseFloat(kw.value) : NaN;
+    const watts = Number.isFinite(typed) && typed > 0 ? typed * 1000 : panelWatts;
+    box.value = String(Math.round(watts * 100) / 100) + " W";
 }
 
 document.addEventListener("DOMContentLoaded", function () {
+    const manualPanelsBox = document.getElementById("panel_quantity_manual");
+    if (manualPanelsBox) { manualPanelsBox.addEventListener("input", function () { calculatePanelQuantity(); }); }
     toggleOtherInverter();
     toggleCustomHeight();
 });

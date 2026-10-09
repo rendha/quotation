@@ -160,8 +160,10 @@
             color: #6b7280;
         }
 
+        .stats.three .stat, .person-stats.three > div { width: 33.33%; }
+
         @media (max-width: 640px) {
-            .stat, .person-stats > div {
+            .stat, .person-stats > div, .stats.three .stat, .person-stats.three > div {
                 width: 50%;
             }
             .person-stats > div {
@@ -210,7 +212,7 @@
     </form>
 
     <!-- TOTAL OF EVERYBODY -->
-    <div class="stats">
+    <div class="stats{% if not show_rates %} three{% endif %}">
         <div class="stat"><div class="stat-card">
             <div class="stat-number">{{ totals.count }}</div>
             <div class="stat-label">Total quotations</div>
@@ -223,10 +225,12 @@
             <div class="stat-number">{{ totals.value_display }}</div>
             <div class="stat-label">Total value</div>
         </div></div>
+        {% if show_rates %}
         <div class="stat"><div class="stat-card">
             <div class="stat-number {% if totals.profit_negative %}loss{% endif %}">{{ totals.profit_display }}</div>
             <div class="stat-label">Total profit</div>
         </div></div>
+        {% endif %}
     </div>
 
     <!-- ONE LINE PER PERSON: tap a name for his own totals -->
@@ -243,11 +247,11 @@
                     <span>see details &rsaquo;</span>
                 </div>
 
-                <div class="person-stats">
+                <div class="person-stats{% if not show_rates %} three{% endif %}">
                     <div><b>{{ person.count }}</b><small>Quotations</small></div>
                     <div><b>{{ person.kw_display }}</b><small>Total kW</small></div>
                     <div><b>{{ person.value_display }}</b><small>Total value</small></div>
-                    <div><b class="{% if person.profit_negative %}loss{% endif %}">{{ person.profit_display }}</b><small>Total profit</small></div>
+                    {% if show_rates %}<div><b class="{% if person.profit_negative %}loss{% endif %}">{{ person.profit_display }}</b><small>Total profit</small></div>{% endif %}
                 </div>
 
             </a>
@@ -266,6 +270,28 @@
 
 <div class="card empty" id="people-empty" style="display:none">
     No person matches.{% if search_url %} Press <b>Search</b> to look through all quotations.{% endif %}
+</div>
+
+<!-- ADMIN passkey: shows the profit (and, on a quotation page, the rates).  No login. -->
+<div class="container">
+    <div class="card">
+        {% if show_rates %}
+            <form method="post" action="{% url 'lock_rates' %}" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'quotation_dashboard' %}">
+                <span style="flex:1;color:#6b7280;font-size:14px">Admin view is ON: profit and rates are visible.</span>
+                <button type="submit" class="header-button" style="background:#3B73B9;border-color:#3B73B9;margin:0">Hide</button>
+            </form>
+        {% else %}
+            <form method="post" action="{% url 'unlock_rates' %}" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'quotation_dashboard' %}">
+                <input type="password" name="passkey" placeholder="Admin passkey" autocomplete="off" style="padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;max-width:220px">
+                <button type="submit" class="header-button" style="background:#3B73B9;border-color:#3B73B9;margin:0">Show profit</button>
+                {% if unlock_error %}<span style="color:#b91c1c;font-size:14px">{{ unlock_error }}</span>{% endif %}
+            </form>
+        {% endif %}
+    </div>
 </div>
 
 {% include "quotations/_live_filter.html" %}

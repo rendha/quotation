@@ -241,7 +241,7 @@
             </div>
         </div>
 
-        {% if quotation.panel_option %}
+        {% if quotation.panel_option and show_rates %}
         <div class="calc-box">
             <div class="calc-row"><div class="calc-label">Total panel capacity</div><div class="calc-value">{{ quotation.panel_total_watt|floatformat:"-2" }} W</div></div>
             <div class="calc-row"><div class="calc-label">Panel cost <small>{{ quotation.panel_quantity }} &times; {{ quotation.panel_option.wattage|floatformat:"-2" }} W &times; &#8377;{{ quotation.panel_option.rate_per_watt|floatformat:"-2" }} per watt</small></div><div class="calc-value">&#8377;{{ quotation.panel_base_amount|floatformat:2 }}</div></div>
@@ -276,7 +276,7 @@
                     <option value="">Select Inverter</option>
                     {% for product in inverter_products %}
                         <option value="{{ product.name }}" {% if quotation.inverter_type == product.name %}selected{% endif %}>
-                            {{ product.name }}{% if product.make %} - {{ product.make }}{% endif %} (&#8377;{{ product.rate|floatformat:2 }})
+                            {{ product.name }}{% if product.make %} - {{ product.make }}{% endif %} {% if show_rates %}(&#8377;{{ product.rate|floatformat:2 }}){% endif %}
                         </option>
                     {% empty %}
                         <option value="polycab" {% if quotation.inverter_type == "polycab" %}selected{% endif %}>Polycab</option>
@@ -313,7 +313,7 @@
                     <option value="">Select DC Cable</option>
                     {% for product in dc_cable_products %}
                         <option value="{{ product.name }}" {% if quotation.dc_cable == product.name %}selected{% endif %}>
-                            {{ product.name }}{% if product.make %} - {{ product.make }}{% endif %} (&#8377;{{ product.rate|floatformat:2 }}/{{ product.unit }})
+                            {{ product.name }}{% if product.make %} - {{ product.make }}{% endif %} {% if show_rates %}(&#8377;{{ product.rate|floatformat:2 }}/{{ product.unit }}){% endif %}
                         </option>
                     {% empty %}
                         <option value="4 SQMM"  {% if quotation.dc_cable == "4 SQMM"  %}selected{% endif %}>4 SQMM</option>
@@ -344,7 +344,7 @@
                     <option value="">Select AC Wire</option>
                     {% for product in ac_wire_products %}
                         <option value="{{ product.name }}" {% if quotation.ac_wire == product.name %}selected{% endif %}>
-                            {{ product.name }}{% if product.make %} - {{ product.make }}{% endif %} (&#8377;{{ product.rate|floatformat:2 }}/{{ product.unit }})
+                            {{ product.name }}{% if product.make %} - {{ product.make }}{% endif %} {% if show_rates %}(&#8377;{{ product.rate|floatformat:2 }}/{{ product.unit }}){% endif %}
                         </option>
                     {% empty %}
                         <option value="2.5 SQMM FR Copper"  {% if quotation.ac_wire == "2.5 SQMM FR Copper"  %}selected{% endif %}>2.5 SQMM FR Copper</option>
@@ -376,7 +376,7 @@
         {% if structure_kind == "gp" or structure_kind == "gi" %}
             <div class="height-section">
                 <div class="field">
-                    <label for="structure_height">Structure Height {% if structure_kind == "gi" %}<span class="hint">(GI is calculated as selected height plus 2 FT)</span>{% endif %}</label>
+                    <label for="structure_height">Structure Height {% if structure_kind == "gi" %}<span class="hint">({% if quotation.system_size|floatformat:"-2" == "3" %}GI is calculated on the selected height{% else %}GI is calculated as selected height plus 2 FT{% endif %})</span>{% elif structure_kind == "gp" and quotation.system_size|floatformat:"-2" == "3" %}<span class="hint">(GP is calculated as selected height minus 1 FT)</span>{% endif %}</label>
                     <select name="structure_height" id="structure_height" onchange="toggleCustomHeight()">
                         <option value="">Select Height</option>
                         <option value="4" {% if quotation.structure_feet == 4 %}selected{% endif %}>4 FT</option>
@@ -414,17 +414,20 @@
             {% endif %}
         </div>
 
+        {% if show_rates %}
         <div class="structure-calculation">
             <div class="structure-row"><div class="structure-label">Structure Wage Factor (&#8377; per watt)</div><div class="structure-value">{{ quotation.structure_wage_factor|floatformat:"-2" }}</div></div>
             <div class="structure-row"><div class="structure-label">Structure Material Cost <small class="hint">{{ summary.structure_note }}</small></div><div class="structure-value">&#8377;{{ quotation.structure_cost|floatformat:2 }}</div></div>
             <div class="structure-row"><div class="structure-label">Structure Wage (calculated)</div><div class="structure-value">&#8377;{{ quotation.structure_wage|floatformat:2 }}</div></div>
         </div>
+        {% endif %}
     </div>
 
 
     <!-- =================================================
-         ADDITIONAL CHARGES
+         ADDITIONAL CHARGES  (admin only)
     ================================================= -->
+    {% if show_rates %}
     <div class="card">
         <h2 class="card-title">Additional Charges</h2>
 
@@ -460,6 +463,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
 
     <!-- =================================================
@@ -467,7 +471,7 @@
     ================================================= -->
     <div class="card">
         <h2 class="card-title">Price Calculation</h2>
-        <div class="card-note">Total cost = the items you selected (including the structure and its calculated wage) + the fixed BOS + the fixed charges. The margin is worked out as in the costing sheet: amount after margin = total cost &divide; {{ summary.margin_factor|floatformat:"-2" }} &times; 100, so the margin is {{ summary.margin_percent|floatformat:"-2" }}% of the amount after margin. Then {{ summary.gst_rate|floatformat:"-2" }}% GST is added, and the total is rounded to the nearest &#8377;100. The result is the final quotation price.</div>
+        {% if show_rates %}<div class="card-note">Total cost = the items you selected (including the structure and its calculated wage) + the fixed BOS + the fixed charges. The margin is worked out as in the costing sheet: amount after margin = total cost &divide; {{ summary.margin_factor|floatformat:"-2" }} &times; 100, so the margin is {{ summary.margin_percent|floatformat:"-2" }}% of the amount after margin. Then {{ summary.gst_rate|floatformat:"-2" }}% GST is added, and the total is rounded to the nearest &#8377;100. The result is the final quotation price.</div>{% endif %}
 
         {% if summary.warnings %}
             <div class="warning"><strong>Check before sending this quotation:</strong>
@@ -475,6 +479,7 @@
             </div>
         {% endif %}
 
+        {% if show_rates %}
         <div class="calc-box">
             {% for line in summary.lines %}
             <div class="calc-row">
@@ -490,7 +495,9 @@
             <div class="calc-row total"><div class="calc-label">QUOTATION AMOUNT <small>before rounding</small></div><div class="calc-value">&#8377;{{ quotation.suggested_quotation_price|floatformat:2 }}</div></div>
             <div class="calc-row final"><div class="calc-label">FINAL PRICE <small>{% if summary.final_is_manual %}entered by hand{% else %}rounded to the nearest &#8377;100{% endif %}</small></div><div class="calc-value">&#8377;{{ quotation.final_quotation_price|floatformat:2 }}</div></div>
         </div>
+        {% endif %}
 
+        {% if show_rates %}
         <details class="cost-details">
             <summary>Show how the cost is made up (for checking)</summary>
             <div class="cost-columns">
@@ -512,6 +519,7 @@
                 </div>
             </div>
         </details>
+        {% endif %}
 
         <div class="pricing-grid">
             <div class="field">
@@ -537,6 +545,26 @@
     </div>
 
 </form>
+
+<!-- ADMIN: the passkey shows the rates, margin and charges on this page (no login; it lasts 8 hours on this device) -->
+<div class="card" style="margin-top:20px">
+    {% if show_rates %}
+        <form method="post" action="{% url 'lock_rates' %}" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <span class="hint" style="flex:1">Admin view is ON: rates, margin and charges are visible.</span>
+            <button type="submit" class="secondary-button">Hide rates</button>
+        </form>
+    {% else %}
+        <form method="post" action="{% url 'unlock_rates' %}" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <input type="password" name="passkey" placeholder="Admin passkey" autocomplete="off" style="max-width:240px">
+            <button type="submit" class="secondary-button">Show rates</button>
+            {% if unlock_error %}<span class="hint" style="color:#b91c1c">{{ unlock_error }}</span>{% endif %}
+        </form>
+    {% endif %}
+</div>
 
 </div>
 

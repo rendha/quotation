@@ -16,6 +16,7 @@ and before every PDF; views.py, the templates and the PDF generator never calcul
         earth rod .......... rate x EARTH_ROD_QUANTITY (fixed 3 nos)                                  (rate sheet)
         ACDB, DCDB, meter box, UG cable, earthing cable, arrester, energy meter, net meter ... by phase  (rate sheet)
         structure material . feet x STRUCTURE WATTS  roof 2 ft | GP selected height | GI selected height + 2 ft
+                             (3 kW only: GP selected height - 1 ft, GI the selected height; STRUCTURE_FEET_ADJUST)
         structure wage ..... wage factor x STRUCTURE WATTS   factor 3 for 3-4 kW, 2.5 for 5 kW and above (calculated, not fixed;
                              a wage typed in by hand on the quotation replaces it)
                              STRUCTURE WATTS = the total panel watts, unless a structure kW is typed on the quotation
@@ -25,8 +26,8 @@ and before every PDF; views.py, the templates and the PDF generator never calcul
             electrical work 8,000, transportation / travel 2,000, KSEB fee 4,720, loading 1,000, documentation 2,500)
     SELLING PRICE = TOTAL COST / margin factor x 100      the costing sheet's "Cost+Margine": the cost is `factor` % of the price
     MARGIN        = SELLING PRICE - TOTAL COST            = a share of the SELLING price: GP % = 100 - factor
-                    factor = the costing sheet's factor per plant size (MARGIN_FACTORS: 3 kW 83.5, 5 kW 85) minus
-                    MARGIN_EXTRA_GP_POINTS (1):  3 kW 82.5 -> GP 17.5%,  5 kW 84 -> GP 16%
+                    factor = the costing sheet's factor per plant size (MARGIN_FACTORS: 5 kW 85) minus
+                    MARGIN_EXTRA_GP_POINTS (1):  5 kW 84 -> GP 16%.   3 kW is fixed at factor 85 -> GP 15% (FIXED_MARGIN_FACTORS)
     + GST         = SELLING PRICE x 9 / 100
     FINAL PRICE   = the amount above rounded to the nearest Rs 100   (a price typed in by hand is kept)
 
@@ -56,6 +57,9 @@ DEFAULT_MARGIN_FACTOR = Decimal("85")
 # One extra point of margin on top of the sheet's GP (3 kW 16.5% -> 17.5%, 5 kW 15% -> 16%): the factor used is the sheet's minus this.
 # 0 = exactly the costing sheet.
 MARGIN_EXTRA_GP_POINTS = Decimal("1")
+# Sizes whose margin factor is fixed here as the FINAL factor (the extra point above is NOT taken off again).
+# 3 kW: GP 15% -> factor 85.   Every other size keeps (sheet factor - MARGIN_EXTRA_GP_POINTS).
+FIXED_MARGIN_FACTORS = {Decimal("3"): Decimal("85")}
 ROUND_FINAL_TO = Decimal("100")         # the final price is rounded to the nearest Rs 100 (Decimal("0.01") would keep the paise)
 
 # How many panels?  The count whose total watts are NEAREST the requested size (3 kW / 540 W: 5 x 540 = 2,700 W or
@@ -91,6 +95,9 @@ DEFAULT_STRUCTURE_FACTOR_3_4 = Decimal("3")        # structure wage: Rs per watt
 DEFAULT_STRUCTURE_FACTOR_5_PLUS = Decimal("2.5")   # ... and for 5 kW and above (both editable in StructureWageSetting)
 ROOF_FIXED_FEET = Decimal("2")
 GI_EXTRA_FEET = Decimal("2")       # a GI structure is priced for its selected height + 2 ft (4 ft -> 6 ft x watts)
+# Per plant size, the feet added to the selected height (default: GI +2, GP 0).
+# 3 kW only: GI = the selected height itself (4 ft -> 4), GP = the selected height minus 1 (4 ft -> 3).
+STRUCTURE_FEET_ADJUST = {Decimal("3"): {"gi": Decimal("0"), "gp": Decimal("-1")}}
 
 # Cable lengths for the two per-metre components that have no box on the page.
 UG_CABLE_METRES = Decimal("30")       # AC UG cable, ACDB to metering panel (the length printed on the sample quotation)
@@ -307,10 +314,10 @@ def calculate_structure(quotation, structure_watts):
 
     if kind == "roof":
         feet = ROOF_FIXED_FEET
-    elif kind == "gp":
-        feet = selected_feet
-    elif kind == "gi":
-        feet = selected_feet + GI_EXTRA_FEET if selected_feet > 0 else ZERO
+    elif kind in ("gp", "gi"):
+        adjust = STRUCTURE_FEET_ADJUST.get(decimal_or_zero(quotation.system_size), {})
+        add = adjust.get(kind, GI_EXTRA_FEET if kind == "gi" else ZERO)
+        feet = max(selected_feet + add, ZERO) if selected_feet > 0 else ZERO
     else:
         feet = ZERO
 
@@ -433,7 +440,10 @@ def margin_factor_for(quotation):
     Whatever margin is stored on an old quotation is NOT used, so changing the factors changes every quotation the next time
     it is opened or printed.
     """
-    factor = MARGIN_FACTORS.get(decimal_or_zero(quotation.system_size), DEFAULT_MARGIN_FACTOR) - MARGIN_EXTRA_GP_POINTS
+    size = decimal_or_zero(quotation.system_size)
+    if size in FIXED_MARGIN_FACTORS:
+        return FIXED_MARGIN_FACTORS[size]
+    factor = MARGIN_FACTORS.get(size, DEFAULT_MARGIN_FACTOR) - MARGIN_EXTRA_GP_POINTS
     return factor if ZERO < factor <= HUNDRED else DEFAULT_MARGIN_FACTOR
 
 

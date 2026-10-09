@@ -28,6 +28,7 @@
         .numbers { margin: 12px 0 8px; }
         .numbers::after { content: ""; display: table; clear: both; }
         .numbers > div { float: left; width: 33.33%; padding-right: 8px; }
+        .numbers.two > div { width: 50%; }
         .numbers b { display: block; font-size: 16px; }
         .numbers small { color: #6b7280; }
         .links a { margin-right: 14px; font-weight: bold; text-decoration: none; font-size: 14px; }
@@ -64,10 +65,10 @@
             </div>
             {% endif %}
 
-            <div class="numbers">
+            <div class="numbers{% if not show_rates %} two{% endif %}">
                 <div><b>{{ item.kw_display }}</b><small>kW</small></div>
                 <div><b>{{ item.value_display }}</b><small>Value</small></div>
-                <div><b class="{% if item.profit_negative %}loss{% endif %}">{{ item.profit_display }}</b><small>Profit</small></div>
+                {% if show_rates %}<div><b class="{% if item.profit_negative %}loss{% endif %}">{{ item.profit_display }}</b><small>Profit</small></div>{% endif %}
             </div>
 
             <small>{{ item.category }} &middot; {{ item.date }}</small>

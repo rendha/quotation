@@ -6,8 +6,12 @@ HTTP only:  read the form  ->  save selections / quantities  ->  calculate_quota
 
 No money is calculated here.  Every amount comes from quotations/calculations.py.
 """
+import hmac
+import os
+import time
 from decimal import Decimal
 
+from django.core import signing
 from django.db import transaction
 from django.http import FileResponse, Http404, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
@@ -56,6 +60,55 @@ def _people_names():
 def _model_has_field(model, name):
     """True when the model has this field (the page offers the manual panel number only once the field has been added and migrated)."""
     return any(field.name == name for field in model._meta.get_fields())
+
+
+# =========================================================
+# ADMIN PASSKEY  (no login: the passkey only decides whether the rates, margin and charges are shown)
+# =========================================================
+# Set the passkey in the environment variable ADMIN_PASSKEY (Render: Environment).  Nothing is shown to anybody while it is not set.
+# Entering it stores a signed cookie on that device for RATES_UNLOCK_HOURS hours.
+
+RATES_COOKIE = "rates_unlock"
+RATES_SALT = "dehlsen-rates-v1"
+RATES_UNLOCK_HOURS = 8
+
+
+def rates_unlocked(request):
+    """True when this browser entered the right passkey in the last RATES_UNLOCK_HOURS hours."""
+    token = request.COOKIES.get(RATES_COOKIE)
+    if not token:
+        return False
+    try:
+        return signing.loads(token, salt=RATES_SALT, max_age=RATES_UNLOCK_HOURS * 3600) == "ok"
+    except signing.BadSignature:
+        return False
+
+
+def _safe_next(request, fallback):
+    """Only go back to a page of this site."""
+    target = request.POST.get("next", "")
+    return target if target.startswith("/") and not target.startswith("//") else fallback
+
+
+def unlock_rates(request):
+    if request.method != "POST":
+        return redirect("quotation_dashboard")
+    passkey = os.environ.get("ADMIN_PASSKEY", "")
+    given = request.POST.get("passkey", "")
+    target = _safe_next(request, reverse("quotation_dashboard"))
+    if passkey and hmac.compare_digest(given.encode(), passkey.encode()):
+        response = redirect(target)
+        response.set_cookie(RATES_COOKIE, signing.dumps("ok", salt=RATES_SALT), max_age=RATES_UNLOCK_HOURS * 3600,
+                            httponly=True, secure=request.is_secure(), samesite="Lax")
+        return response
+    time.sleep(1)                                           # slows down guessing
+    return redirect(target + ("&" if "?" in target else "?") + "passkey=wrong")
+
+
+def lock_rates(request):
+    response = redirect(_safe_next(request, reverse("quotation_dashboard")))
+    response.delete_cookie(RATES_COOKIE)
+    return response
 
 
 # =========================================================
@@ -404,17 +457,17 @@ def quotation_detail(request, quotation_id):
             quotation.structure_feet = decimal_or_zero(structure_height)
 
         # ---- additional charges ----
-        quotation.electrical_work = decimal_or_zero(request.POST.get("electrical_work"))
-        quotation.transportation_travel = decimal_or_zero(request.POST.get("transportation_travel"))
-        quotation.kseb_fee = decimal_or_zero(request.POST.get("kseb_fee"))
-        quotation.loading_charge = decimal_or_zero(request.POST.get("loading_charge"))
-        quotation.documentation = decimal_or_zero(request.POST.get("documentation"))
+        # (these boxes are on the page only in the admin view: when they are missing, the saved amounts are kept)
+        for field in ("electrical_work", "transportation_travel", "kseb_fee", "loading_charge", "documentation"):
+            if field in request.POST:
+                setattr(quotation, field, decimal_or_zero(request.POST.get(field)))
 
         # ---- structure wage and final price ----
         # They are handed on exactly as submitted.  calculations.py decides whether they were typed by
         # hand (kept) or are just the previously displayed automatic values (recalculated).
         # A blank box means "automatic".
-        quotation.structure_work = decimal_or_zero(request.POST.get("structure_wage"))
+        if "structure_wage" in request.POST:
+            quotation.structure_work = decimal_or_zero(request.POST.get("structure_wage"))
         quotation.final_quotation_price = decimal_or_zero(request.POST.get("final_quotation_price"))
 
         # ---- customer details (editable on the detail page too) ----
@@ -462,6 +515,8 @@ def quotation_detail(request, quotation_id):
             "panel_shortfall_percent": PANEL_SHORTFALL_ALLOWED_PERCENT,          # the page's live panel count uses the same rule
             "can_edit_panels": _model_has_field(Quotation, "panel_quantity_manual"),
             "can_edit_structure_kw": _model_has_field(Quotation, "structure_kw_manual"),
+            "show_rates": rates_unlocked(request),
+            "unlock_error": "Wrong passkey." if request.GET.get("passkey") == "wrong" else "",
             "people_names": _people_names(),
         },
     )
@@ -515,6 +570,8 @@ def dashboard(request):
         "totals": stats.format_summary(stats.summarize(rows)),
         "people": stats.people(rows),
         "person_url": _person_url(),
+        "show_rates": rates_unlocked(request),
+        "unlock_error": "Wrong passkey." if request.GET.get("passkey") == "wrong" else "",
     })
 
 
@@ -538,6 +595,7 @@ def person_dashboard(request):
         "person_name": stats.most_common_name(q.customer_name for q in quotations) or stats.NO_NAME_TEXT,
         "totals": stats.format_summary(stats.summarize(stats.rows_of(quotations))),
         "items": items,
+        "show_rates": rates_unlocked(request),
     })
 
 
@@ -556,4 +614,4 @@ def search(request):
                       "kw_display": line["kw_display"], "value_display": line["value_display"],
                       "profit_display": line["profit_display"], "profit_negative": line["profit_negative"]})
 
-    return render(request, "quotations/search.html", {"query": query, "items": items, "person_url": _person_url()})
+    return render(request, "quotations/search.html", {"query": query, "items": items, "person_url": _person_url(), "show_rates": rates_unlocked(request)})

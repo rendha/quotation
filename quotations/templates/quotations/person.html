@@ -95,6 +95,10 @@
             padding-right: 8px;
         }
 
+        .numbers.two > div {
+            width: 50%;
+        }
+
         .numbers b {
             display: block;
             font-size: 16px;
@@ -112,8 +116,10 @@
             font-size: 14px;
         }
 
+        .stats.three .stat { width: 33.33%; }
+
         @media (max-width: 640px) {
-            .stat {
+            .stat, .stats.three .stat {
                 width: 50%;
             }
         }
@@ -136,7 +142,7 @@
 
 <div class="container">
 
-    <div class="stats">
+    <div class="stats{% if not show_rates %} three{% endif %}">
         <div class="stat"><div class="stat-card">
             <div class="stat-number">{{ totals.count }}</div>
             <div class="stat-label">Total quotations</div>
@@ -149,10 +155,12 @@
             <div class="stat-number">{{ totals.value_display }}</div>
             <div class="stat-label">Total value</div>
         </div></div>
+        {% if show_rates %}
         <div class="stat"><div class="stat-card">
             <div class="stat-number {% if totals.profit_negative %}loss{% endif %}">{{ totals.profit_display }}</div>
             <div class="stat-label">Total profit</div>
         </div></div>
+        {% endif %}
     </div>
 
     <h2>Quotations</h2>
@@ -170,10 +178,10 @@
 
             <div>{{ item.business_name }}{% if item.location %} · {{ item.location }}{% endif %}</div>
 
-            <div class="numbers">
+            <div class="numbers{% if not show_rates %} two{% endif %}">
                 <div><b>{{ item.kw_display }}</b><small>kW</small></div>
                 <div><b>{{ item.value_display }}</b><small>Value</small></div>
-                <div><b class="{% if item.profit_negative %}loss{% endif %}">{{ item.profit_display }}</b><small>Profit</small></div>
+                {% if show_rates %}<div><b class="{% if item.profit_negative %}loss{% endif %}">{{ item.profit_display }}</b><small>Profit</small></div>{% endif %}
             </div>
 
             <small>{{ item.category }} · {{ item.date }}</small>

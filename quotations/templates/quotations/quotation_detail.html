@@ -539,8 +539,8 @@
         <div class="actions">
             <a href="{% url 'quotation_dashboard' %}" class="back">&larr; Back to Quotations</a>
             <button type="submit" class="primary-button">Save &amp; Recalculate</button>
-            <a href="{% url 'quotation_pdf' quotation.id %}" class="pdf-button" target="_blank"
-               onclick="this.href='{% url 'quotation_pdf' quotation.id %}?t='+Date.now();">Open PDF</a>
+            <a href="{% url 'quotation_pdf_named' quotation.id pdf_name %}" class="pdf-button" target="_blank"
+               onclick="this.href='{% url 'quotation_pdf_named' quotation.id pdf_name %}?t='+Date.now();">Open PDF</a>
         </div>
     </div>
 

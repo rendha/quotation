@@ -188,7 +188,7 @@
 
             <div class="links">
                 <a href="{% url 'quotation_detail' item.id %}">Open</a>
-                <a href="{% url 'quotation_pdf' item.id %}">PDF</a>
+                <a href="{% url 'quotation_pdf_named' item.id item.pdf_name %}">PDF</a>
             </div>
 
         </div>

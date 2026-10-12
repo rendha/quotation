@@ -517,6 +517,7 @@ def quotation_detail(request, quotation_id):
             "can_edit_structure_kw": _model_has_field(Quotation, "structure_kw_manual"),
             "show_rates": rates_unlocked(request),
             "unlock_error": "Wrong passkey." if request.GET.get("passkey") == "wrong" else "",
+            "pdf_name": pdf_filename(quotation),
             "people_names": _people_names(),
         },
     )
@@ -526,8 +527,9 @@ def quotation_detail(request, quotation_id):
 # QUOTATION PDF
 # =========================================================
 
-def quotation_pdf(request, quotation_id):
-    """The PDF only PRINTS the saved calculation; recalculating first makes sure it is the current one."""
+def quotation_pdf(request, quotation_id, filename=None):
+    """The PDF only PRINTS the saved calculation; recalculating first makes sure it is the current one.
+    `filename` is only the last part of the address (/pdf/12/HUDA_3kW.pdf): phones name a saved PDF after the address, not after the header."""
     quotation = get_object_or_404(
         Quotation.objects.select_related("panel_option", "solar_package").prefetch_related("items__product"),
         id=quotation_id,
@@ -587,6 +589,7 @@ def person_dashboard(request):
     for q in quotations:
         line = stats.format_summary(stats.summarize(stats.rows_of([q])))
         items.append({"id": q.id, "offer_no": q.offer_no, "business_name": q.business_name, "location": q.location, "date": q.date,
+                      "pdf_name": pdf_filename(q),
                       "category": q.category, "kw_display": line["kw_display"], "value_display": line["value_display"],
                       "profit_display": line["profit_display"], "profit_negative": line["profit_negative"],
                       "search": stats.search_text(q) + " " + line["value_text"] + " " + line["kw_text"]})
@@ -610,6 +613,7 @@ def search(request):
     for q in found:
         line = stats.format_summary(stats.summarize(stats.rows_of([q])))
         items.append({"id": q.id, "offer_no": q.offer_no, "business_name": q.business_name, "location": q.location, "date": q.date,
+                      "pdf_name": pdf_filename(q),
                       "category": q.category, "person_name": q.customer_name, "person_link": stats.link_key_for(q.customer_name),
                       "kw_display": line["kw_display"], "value_display": line["value_display"],
                       "profit_display": line["profit_display"], "profit_negative": line["profit_negative"]})

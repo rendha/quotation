@@ -106,7 +106,7 @@ def number_text(value):
 
 
 # ---------------------------------------------------------------------------------------------- totals
-ROW_FIELDS = ("customer_name", "system_size", "final_quotation_price", "margin_amount")
+ROW_FIELDS = ("id", "customer_name", "business_name", "phone", "counted", "system_size", "final_quotation_price", "margin_amount")
 
 
 def rows_of(quotations):
@@ -134,6 +134,46 @@ def summarize(rows):
     }
 
 
+def client_key(row):
+    """Who is the same CLIENT: the person (Quotation For), the business name and the phone's last 10 digits (capitals / spaces ignored)."""
+    digits = "".join(ch for ch in str(row.get("phone") or "") if ch.isdigit())
+    return (name_key(row.get("customer_name")), name_key(row.get("business_name")), digits[-10:])
+
+
+def group_clients(rows):
+    """
+    One entry per client: {"picked": the quotation that counts, "others": the client's other quotations, "chosen": True when picked by hand}.
+    The counted quotation is the one marked `counted`; when none is marked it is the LOWEST price (a quotation without a price only
+    when there is nothing else).  Order = the order of the rows.
+    """
+    groups, order = {}, []
+    for row in rows:
+        key = client_key(row)
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(row)
+    result = []
+    for key in order:
+        items = groups[key]
+        marked = [r for r in items if r.get("counted")]
+        pool = marked or items
+        priced = [r for r in pool if row_value(r) > 0] or pool
+        picked = min(priced, key=lambda r: (row_value(r), r.get("id") or 0))
+        result.append({"picked": picked, "others": [r for r in items if r is not picked], "chosen": bool(picked.get("counted"))})
+    return result
+
+
+def summarize_clients(rows):
+    """Like summarize(), but kW / value / profit count ONE quotation per client.  count = all quotations, clients = how many clients."""
+    rows = list(rows)
+    groups = group_clients(rows)
+    out = summarize([g["picked"] for g in groups])
+    out["count"] = len(rows)
+    out["clients"] = len(groups)
+    return out
+
+
 def format_summary(summary):
     """The same numbers with the text the page prints: Indian grouping, no decimals, and a loss as '-' before the rupee sign."""
     out = dict(summary)
@@ -159,7 +199,7 @@ def people(rows):
 
     result = []
     for key, items in groups.items():
-        entry = format_summary(summarize(items))
+        entry = format_summary(summarize_clients(items))
         entry.update(key=key, link_key=NO_NAME_KEY if key == "" else key,
                      name=most_common_name(r.get("customer_name") for r in items) or NO_NAME_TEXT)
         result.append(entry)

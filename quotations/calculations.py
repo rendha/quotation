@@ -60,6 +60,10 @@ MARGIN_EXTRA_GP_POINTS = Decimal("1")
 # Sizes whose margin factor is fixed here as the FINAL factor (the extra point above is NOT taken off again).
 # 3 kW: GP 15% -> factor 85.   Every other size keeps (sheet factor - MARGIN_EXTRA_GP_POINTS).
 FIXED_MARGIN_FACTORS = {Decimal("3"): Decimal("85")}
+# The margin is now one fixed 15% GP for EVERY plant size (selling price = cost / 85 x 100).  Change this one number to change it.
+FIXED_MARGIN_FACTOR_ALL = Decimal("85")
+# KSEB fee = inverter kW x this rate (5 kW inverter -> 5 x 1000 = Rs 5,000).  It is calculated, no longer typed.
+KSEB_FEE_PER_INVERTER_KW = Decimal("1000")
 ROUND_FINAL_TO = Decimal("100")         # the final price is rounded to the nearest Rs 100 (Decimal("0.01") would keep the paise)
 
 # How many panels?  The count whose total watts are NEAREST the requested size (3 kW / 540 W: 5 x 540 = 2,700 W or
@@ -441,10 +445,7 @@ def margin_factor_for(quotation):
     it is opened or printed.
     """
     size = decimal_or_zero(quotation.system_size)
-    if size in FIXED_MARGIN_FACTORS:
-        return FIXED_MARGIN_FACTORS[size]
-    factor = MARGIN_FACTORS.get(size, DEFAULT_MARGIN_FACTOR) - MARGIN_EXTRA_GP_POINTS
-    return factor if ZERO < factor <= HUNDRED else DEFAULT_MARGIN_FACTOR
+    return FIXED_MARGIN_FACTOR_ALL      # every plant size: factor 85 -> GP 15%
 
 
 def round_to_nearest(amount, step=None):
@@ -606,10 +607,11 @@ def _compute(quotation):
     structure_work = money(stored_work) if wage_is_manual else calculated_wage
 
     # ---- 11. ADDITIONAL CHARGES (structure_work is the wage above) --------------------------------------
+    kseb_fee = money(inverter_kw * KSEB_FEE_PER_INVERTER_KW)
     charge_lines = [
         _line("electrical_work", "Electrical work", decimal_or_zero(quotation.electrical_work)),
         _line("transportation_travel", "Transportation / travel", decimal_or_zero(quotation.transportation_travel)),
-        _line("kseb_fee", "KSEB fee", decimal_or_zero(quotation.kseb_fee)),
+        _line("kseb_fee", "KSEB fee", kseb_fee, "%s kW inverter x Rs %s" % (plain_number(inverter_kw), plain_number(KSEB_FEE_PER_INVERTER_KW))),
         _line("loading_charge", "Loading charge", decimal_or_zero(quotation.loading_charge)),
         _line("documentation", "Documentation", decimal_or_zero(quotation.documentation)),
     ]
@@ -666,6 +668,7 @@ def _compute(quotation):
         "components_total": components_total, "bos_amount": bos_amount, "structure_note": structure_note,
         "structure_watts": structure_watts, "structure_watts_auto": panel_total_watt, "structure_is_manual": structure_is_manual,
         "inverter_kw": inverter_kw,
+        "kseb_fee": kseb_fee,
         "structure_cost": structure_material, "structure_wage_factor": wage_factor,
         "calculated_structure_wage": calculated_wage, "structure_work": structure_work, "wage_is_manual": wage_is_manual,
         "calculated_cost": calculated_cost,
@@ -741,6 +744,7 @@ def calculate_quotation(quotation):
     quotation.dc_cable = r["selected"]["dc_cable"]
     quotation.ac_wire = r["selected"]["ac_wire"]
     quotation.inverter_kw = r["inverter_kw"]
+    quotation.kseb_fee = r["kseb_fee"]                          # always inverter kW x 1000
     inverter = r["components"]["inverter"]
     quotation.inverter_make = inverter["make"]
     quotation.inverter_rate = inverter["rate"]

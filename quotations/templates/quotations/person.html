@@ -163,6 +163,8 @@
         {% endif %}
     </div>
 
+    <div class="count" style="margin:-6px 0 12px">Totals count one quotation per client ({{ totals.clients }} client{{ totals.clients|pluralize }}, {{ totals.count }} quotation{{ totals.count|pluralize }}).</div>
+
     <h2>Quotations</h2>
 
     <div class="search-form">
@@ -185,11 +187,39 @@
             </div>
 
             <small>{{ item.category }} · {{ item.date }}</small>
+            {% if item.others %}<div><small><b>{% if item.chosen %}Counted: chosen by you{% else %}Counted: lowest of {{ item.others|length|add:1 }}{% endif %}</b></small></div>{% endif %}
 
             <div class="links">
                 <a href="{% url 'quotation_detail' item.id %}">Open</a>
                 <a href="{% url 'quotation_pdf_named' item.id item.pdf_name %}">PDF</a>
+                <a href="{% url 'create_quotation' %}?from={{ item.id }}">+ Quote again</a>
             </div>
+
+            {% if item.others %}
+            <details style="margin-top:10px">
+                <summary style="cursor:pointer;color:#3B73B9;font-weight:bold;font-size:14px">+{{ item.others|length }} other quotation{{ item.others|length|pluralize }} for this client</summary>
+                {% for other in item.others %}
+                <div style="border-top:1px solid #e5e7eb;margin-top:10px;padding-top:10px">
+                    <b>{{ other.offer_no }}</b> · {{ other.kw_display }} · {{ other.value_display }}{% if show_rates %} · profit {{ other.profit_display }}{% endif %}<br>
+                    <small>{{ other.category }} · {{ other.date }}</small>
+                    <div class="links">
+                        <a href="{% url 'quotation_detail' other.id %}">Open</a>
+                        <a href="{% url 'quotation_pdf_named' other.id other.pdf_name %}">PDF</a>
+                    </div>
+                    <form method="post" action="{% url 'set_counted' other.id %}" style="margin-top:6px">
+                        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" style="background:#eef4fb;color:#3B73B9;border:0;border-radius:8px;padding:8px 14px;font-weight:bold;cursor:pointer">Count this one</button>
+                    </form>
+                </div>
+                {% endfor %}
+                {% if item.chosen %}
+                <form method="post" action="{% url 'set_counted' item.id %}" style="margin-top:10px">
+                    {% csrf_token %}<input type="hidden" name="action" value="clear"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" style="background:none;color:#6b7280;border:0;padding:0;text-decoration:underline;cursor:pointer">Back to counting the lowest</button>
+                </form>
+                {% endif %}
+            </details>
+            {% endif %}
 
         </div>
 

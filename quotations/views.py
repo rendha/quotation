@@ -214,7 +214,12 @@ def _create_error(request, message, posted=None):
 def create_quotation(request):
 
     if request.method != "POST":
-        return render(request, "quotations/create_quotation.html", {"posted": {}, "people_names": _people_names()})
+        posted = {}
+        source = Quotation.objects.filter(id=request.GET.get("from") or 0).first() if str(request.GET.get("from") or "").isdigit() else None
+        if source is not None:             # "Quote again": the same customer's details, nothing else
+            posted = {"business_name": source.business_name, "customer_name": source.customer_name, "phone": source.phone,
+                      "email": source.email, "address": source.address, "location": source.location}
+        return render(request, "quotations/create_quotation.html", {"posted": posted, "people_names": _people_names(), "quote_again": source is not None})
 
     posted = {key: clean_text(request.POST.get(key)) for key in (
         "business_name", "customer_name", "phone", "email", "address", "location",
@@ -569,7 +574,7 @@ def dashboard(request):
     rows = stats.rows_of(quotations)
     return render(request, "quotations/dashboard.html", {
         "quotations": quotations,
-        "totals": stats.format_summary(stats.summarize(rows)),
+        "totals": stats.format_summary(stats.summarize_clients(rows)),
         "people": stats.people(rows),
         "person_url": _person_url(),
         "show_rates": rates_unlocked(request),
@@ -585,21 +590,42 @@ def person_dashboard(request):
     if not quotations:
         raise Http404("There is no quotation for this name.")
 
-    items = []
-    for q in quotations:
+    def make_item(q):
         line = stats.format_summary(stats.summarize(stats.rows_of([q])))
-        items.append({"id": q.id, "offer_no": q.offer_no, "business_name": q.business_name, "location": q.location, "date": q.date,
-                      "pdf_name": pdf_filename(q),
-                      "category": q.category, "kw_display": line["kw_display"], "value_display": line["value_display"],
-                      "profit_display": line["profit_display"], "profit_negative": line["profit_negative"],
-                      "search": stats.search_text(q) + " " + line["value_text"] + " " + line["kw_text"]})
+        return {"id": q.id, "offer_no": q.offer_no, "business_name": q.business_name, "location": q.location, "date": q.date,
+                "pdf_name": pdf_filename(q),
+                "category": q.category, "kw_display": line["kw_display"], "value_display": line["value_display"],
+                "profit_display": line["profit_display"], "profit_negative": line["profit_negative"],
+                "search": stats.search_text(q) + " " + line["value_text"] + " " + line["kw_text"]}
+
+    by_id = {q.id: q for q in quotations}
+    items = []
+    for group in stats.group_clients(stats.rows_of(quotations)):
+        item = make_item(by_id[group["picked"]["id"]])
+        item["others"] = [make_item(by_id[r["id"]]) for r in group["others"]]
+        item["chosen"] = group["chosen"]
+        item["search"] += " " + " ".join(o["search"] for o in item["others"])
+        items.append(item)
 
     return render(request, "quotations/person.html", {
         "person_name": stats.most_common_name(q.customer_name for q in quotations) or stats.NO_NAME_TEXT,
-        "totals": stats.format_summary(stats.summarize(stats.rows_of(quotations))),
+        "totals": stats.format_summary(stats.summarize_clients(stats.rows_of(quotations))),
         "items": items,
         "show_rates": rates_unlocked(request),
     })
+
+
+def set_counted(request, quotation_id):
+    """POST: make this quotation the one that counts for its client (action=clear: back to the lowest price)."""
+    if request.method != "POST":
+        return HttpResponseBadRequest("POST only")
+    quotation = get_object_or_404(Quotation, id=quotation_id)
+    key = stats.client_key(stats.rows_of([quotation])[0])
+    same = [q.id for q in Quotation.objects.all() if stats.client_key(stats.rows_of([q])[0]) == key]
+    Quotation.objects.filter(id__in=same).update(counted=False)
+    if request.POST.get("action") != "clear":
+        Quotation.objects.filter(id=quotation.id).update(counted=True)
+    return redirect(_safe_next(request, reverse("quotation_dashboard")))
 
 
 def search(request):

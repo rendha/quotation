@@ -17,6 +17,7 @@ urlpatterns = [
     path("sw.js", pwa_views.service_worker, name="service_worker"),
     path("offline/", pwa_views.offline, name="offline"),
     path("search/", views.search, name="search"),
+    path("quotation/<int:quotation_id>/counted/", views.set_counted, name="set_counted"),
     path("rates/unlock/", views.unlock_rates, name="unlock_rates"),
     path("rates/lock/", views.lock_rates, name="lock_rates"),
     path("pdf/<int:quotation_id>/<str:filename>", views.quotation_pdf, name="quotation_pdf_named"),

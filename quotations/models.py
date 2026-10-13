@@ -732,6 +732,10 @@ class Quotation(models.Model):
         blank=True
     )
 
+    # The quotation that COUNTS in the totals when one client has several (see dashboard_stats.group_clients).
+    # False for all = the lowest-priced quotation of that client counts.
+    counted = models.BooleanField(default=False)
+
     structure_total = models.DecimalField(
         max_digits=14,
         decimal_places=2,

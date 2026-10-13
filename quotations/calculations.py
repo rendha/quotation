@@ -752,3 +752,29 @@ def calculate_quotation(quotation):
 
     quotation.cost_breakdown = r
     return quotation
+
+def material_list(quotation):
+    """
+    The materials of a quotation as plain rows for the separate materials website (read only, nothing is saved):
+    [{"name", "make", "unit", "quantity", "rate"}]  - rate = the price of ONE unit in the rate sheet.
+    Panels, the inverter, cables, earth rods and the other priced components, then the structure and the BOS as one lot each.
+    """
+    r = _compute(quotation)
+    rows = []
+
+    def add(name, make, unit, quantity, rate):
+        rows.append({"name": clean_text(name), "make": clean_text(make), "unit": unit,
+                     "quantity": str(decimal_or_zero(quantity)), "rate": str(money(rate))})
+
+    panel = quotation.panel_option
+    if panel is not None and r["panel_quantity"] > 0:
+        label = " ".join(x for x in (clean_text(panel.company), clean_text(panel.panel_type), plain_number(panel.wattage) + " W solar panel") if x)
+        add(label, panel.company, "Nos", r["panel_quantity"], Decimal(panel.wattage) * Decimal(panel.rate_per_watt))
+    for component in r["components"].values():
+        if component["quantity"] > 0 and component["name"]:
+            add(component["name"], component["make"], component["unit"], component["quantity"], component["rate"])
+    if r["structure_cost"] > 0:
+        add("Structure material (%s)" % clean_text(quotation.structure), "", "Set", 1, r["structure_cost"])
+    if r["bos_amount"] > 0:
+        add("BOS items (fixed set for %s kW)" % plain_number(decimal_or_zero(quotation.system_size)), "", "Lot", 1, r["bos_amount"])
+    return rows

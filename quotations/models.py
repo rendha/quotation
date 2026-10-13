@@ -736,6 +736,9 @@ class Quotation(models.Model):
     # False for all = the lowest-priced quotation of that client counts.
     counted = models.BooleanField(default=False)
 
+    # True once the client said yes: the quotation became a customer.  Only these are offered to the separate materials website.
+    is_customer = models.BooleanField(default=False)
+
     structure_total = models.DecimalField(
         max_digits=14,
         decimal_places=2,

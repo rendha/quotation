@@ -13,12 +13,14 @@ from decimal import Decimal
 
 from django.core import signing
 from django.db import transaction
-from django.http import FileResponse, Http404, HttpResponseBadRequest
+from django.contrib.auth.decorators import login_not_required
+from django.http import FileResponse, Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
 from .calculations import (
+    material_list,
     PANEL_SHORTFALL_ALLOWED_PERCENT,
     calculate_panel_quantity,
     parse_manual_panels,
@@ -593,7 +595,7 @@ def person_dashboard(request):
     def make_item(q):
         line = stats.format_summary(stats.summarize(stats.rows_of([q])))
         return {"id": q.id, "offer_no": q.offer_no, "business_name": q.business_name, "location": q.location, "date": q.date,
-                "pdf_name": pdf_filename(q),
+                "pdf_name": pdf_filename(q), "is_customer": q.is_customer,
                 "category": q.category, "kw_display": line["kw_display"], "value_display": line["value_display"],
                 "profit_display": line["profit_display"], "profit_negative": line["profit_negative"],
                 "search": stats.search_text(q) + " " + line["value_text"] + " " + line["kw_text"]}
@@ -604,6 +606,10 @@ def person_dashboard(request):
         item = make_item(by_id[group["picked"]["id"]])
         item["others"] = [make_item(by_id[r["id"]]) for r in group["others"]]
         item["chosen"] = group["chosen"]
+        confirmed = [x for x in [item] + item["others"] if x["is_customer"]]
+        item["customer_id"] = confirmed[0]["id"] if confirmed else None
+        item["customer_offer"] = confirmed[0]["offer_no"] if confirmed else ""
+        item["preselect"] = item["customer_id"] or item["id"]
         item["search"] += " " + " ".join(o["search"] for o in item["others"])
         items.append(item)
 
@@ -613,6 +619,60 @@ def person_dashboard(request):
         "items": items,
         "show_rates": rates_unlocked(request),
     })
+
+
+@login_not_required
+def materials_api(request):
+    """
+    Read-only data for the separate materials website.  Needs the header  X-API-Key  equal to the environment variable
+    MATERIALS_API_KEY (switched off when that is not set).      /api/materials/?q=huda       a search, newest first
+                                                               /api/materials/?id=12        one quotation with its material list
+    """
+    expected = os.environ.get("MATERIALS_API_KEY", "")
+    given = request.headers.get("X-API-Key", "")
+    if not expected or not hmac.compare_digest(expected.encode(), given.encode()):
+        raise Http404()
+
+    def header(q):
+        return {"id": q.id, "offer_no": q.offer_no, "business_name": q.business_name, "customer_name": q.customer_name,
+                "phone": q.phone, "location": q.location, "system_size": str(q.system_size), "date": str(q.date)}
+
+    if request.GET.get("id", "").isdigit():
+        quotation = get_object_or_404(Quotation, id=int(request.GET["id"]), is_customer=True)
+        data = header(quotation)
+        data["items"] = material_list(quotation)
+        return JsonResponse(data)
+
+    query = request.GET.get("q", "").strip()
+    found = [q for q in Quotation.objects.filter(is_customer=True).order_by("-created_at")[:500] if not query or stats.matches(stats.search_text(q), query)]
+    return JsonResponse({"quotations": [header(q) for q in found[:30]]})
+
+
+def confirm_customer(request, quotation_id=None):
+    """
+    POST: the client said yes - this quotation becomes a customer (and is the one that counts for the client).
+    With the id in the address, pressing again undoes it.  Without it (the choice list on the person page) the chosen
+    quotation_id is only ever CONFIRMED, never undone.
+    """
+    if request.method != "POST":
+        return HttpResponseBadRequest("POST only")
+    choice = quotation_id is None
+    if choice:
+        raw = request.POST.get("quotation_id", "")
+        if not raw.isdigit():
+            return HttpResponseBadRequest("Choose a quotation.")
+        quotation_id = int(raw)
+    quotation = get_object_or_404(Quotation, id=quotation_id)
+    if quotation.is_customer and choice:
+        pass
+    elif quotation.is_customer:
+        Quotation.objects.filter(id=quotation.id).update(is_customer=False)
+    else:
+        key = stats.client_key(stats.rows_of([quotation])[0])
+        same = [q.id for q in Quotation.objects.all() if stats.client_key(stats.rows_of([q])[0]) == key]
+        Quotation.objects.filter(id__in=same).update(counted=False, is_customer=False)     # one confirmed quotation per client
+        Quotation.objects.filter(id=quotation.id).update(counted=True, is_customer=True)
+    return redirect(_safe_next(request, reverse("quotation_detail", args=[quotation.id])))
 
 
 def set_counted(request, quotation_id):

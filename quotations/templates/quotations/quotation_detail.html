@@ -14,6 +14,8 @@
         /* HEADER */
         .header { background: #3B73B9; color: white; padding: 22px 25px; }
         .header-inner { max-width: 1100px; margin: auto; display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; }
+        .top-back { display: inline-block; margin-bottom: 8px; color: white; text-decoration: none; font-size: 14px; opacity: 0.95; }
+        .top-back:hover { text-decoration: underline; }
         .header h1 { margin: 0; font-size: 23px; }
         .header p { margin: 5px 0 0; font-size: 14px; opacity: 0.9; }
         .header-price { text-align: right; }
@@ -144,6 +146,7 @@
 <div class="header">
     <div class="header-inner">
         <div>
+            <a href="{% url 'quotation_dashboard' %}" class="top-back">&larr; Back to Quotations</a>
             <h1>{{ quotation.offer_no }}</h1>
             <p>Quotation Builder &middot; {{ quotation.business_name }}</p>
         </div>
@@ -539,7 +542,6 @@
         <div class="actions">
             <a href="{% url 'quotation_dashboard' %}" class="back">&larr; Back to Quotations</a>
             <button type="submit" class="primary-button">Save &amp; Recalculate</button>
-            <a href="{% url 'create_quotation' %}?from={{ quotation.id }}" class="pdf-button" style="background:#eef4fb;color:#3B73B9">+ Quote again for this client</a>
             <a href="{% url 'quotation_pdf_named' quotation.id pdf_name %}" class="pdf-button" target="_blank"
                onclick="this.href='{% url 'quotation_pdf_named' quotation.id pdf_name %}?t='+Date.now();">Open PDF</a>
         </div>

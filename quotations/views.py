@@ -20,6 +20,7 @@ from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
 from .calculations import (
+    labour_amounts,
     material_list,
     PANEL_SHORTFALL_ALLOWED_PERCENT,
     calculate_panel_quantity,
@@ -639,8 +640,12 @@ def materials_api(request):
 
     if request.GET.get("id", "").isdigit():
         quotation = get_object_or_404(Quotation, id=int(request.GET["id"]), is_customer=True)
-        data = header(quotation)
-        data["items"] = material_list(quotation)
+        try:
+            data = header(quotation)
+            data["items"] = material_list(quotation)
+            data.update(labour_amounts(quotation))
+        except Exception as problem:         # show the real reason to the materials website (this address needs the secret key anyway)
+            return JsonResponse({"error": "%s: %s" % (type(problem).__name__, problem)}, status=500)
         return JsonResponse(data)
 
     query = request.GET.get("q", "").strip()

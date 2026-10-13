@@ -778,3 +778,9 @@ def material_list(quotation):
     if r["bos_amount"] > 0:
         add("BOS items (fixed set for %s kW)" % plain_number(decimal_or_zero(quotation.system_size)), "", "Lot", 1, r["bos_amount"])
     return rows
+
+
+def labour_amounts(quotation):
+    """The structure wage and the electrical work of a quotation (what the quotation allows for them), for the materials website."""
+    r = _compute(quotation)
+    return {"structure_wage": str(money(r["structure_work"])), "electrical_work": str(money(decimal_or_zero(quotation.electrical_work)))}

@@ -774,7 +774,7 @@ def material_list(quotation):
         if component["quantity"] > 0 and component["name"]:
             add(component["name"], component["make"], component["unit"], component["quantity"], component["rate"])
     if r["structure_cost"] > 0:
-        add("Structure material (%s)" % clean_text(quotation.structure), "", "Set", 1, r["structure_cost"])
+        add("Structure material (%s)" % clean_text(quotation.structure_type), "", "Set", 1, r["structure_cost"])
     if r["bos_amount"] > 0:
         add("BOS items (fixed set for %s kW)" % plain_number(decimal_or_zero(quotation.system_size)), "", "Lot", 1, r["bos_amount"])
     return rows

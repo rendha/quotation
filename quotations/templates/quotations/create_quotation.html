@@ -204,6 +204,7 @@
                 <select id="system_size" name="system_size" required>
                     <option value="">Select system size</option>
                     <option value="3" {% if posted.system_size == "3" %}selected{% endif %}>3 kW</option>
+                    <option value="4" {% if posted.system_size == "4" %}selected{% endif %}>4 kW</option>
                     <option value="5" {% if posted.system_size == "5" %}selected{% endif %}>5 kW</option>
                     <option value="8" {% if posted.system_size == "8" %}selected{% endif %}>8 kW</option>
                 </select>
@@ -226,6 +227,11 @@
                     <input type="radio" id="gi" name="structure" value="GI"
                            {% if posted.structure == "GI" %}checked{% endif %}>
                     <label for="gi">GI</label>
+                </div>
+                <div class="option">
+                    <input type="radio" id="tata_gi" name="structure" value="TATA GI"
+                           {% if posted.structure == "TATA GI" %}checked{% endif %}>
+                    <label for="tata_gi">TATA GI</label>
                 </div>
             </div>
 

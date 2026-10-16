@@ -20,7 +20,7 @@ from pathlib import Path
 from pypdf import PdfReader, PdfWriter
 
 from . import pdf_layout as L
-from .calculations import GST_RATE, find_quotation_item, structure_kind
+from .calculations import GST_RATE, find_quotation_item, is_tata, structure_kind
 from .pdf_boq_sample import SAMPLE_BOQ
 
 DESIGN_DIR = Path(__file__).resolve().parent / "pdf_design"
@@ -227,7 +227,7 @@ def _row_structure(q, item, row):
     feet = Decimal("2") if kind == "roof" else q.structure_feet
     if _positive(feet):
         spec = spec.replace("Height: 1.2M", "Height: %s FT" % L.fmt_num(feet))
-    return {"spec": spec, "qty": "1", "make": STRUCTURE_MAKE}
+    return {"spec": spec, "qty": "1", "make": "TATA" if is_tata(q.structure_type) else STRUCTURE_MAKE}
 
 
 def _row_box(q, item, row):

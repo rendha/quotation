@@ -174,7 +174,7 @@
             <div class="summary-item"><div class="summary-label">System Size</div><div class="summary-value">{{ quotation.system_size|floatformat:"-2" }} kW</div></div>
             <div class="summary-item"><div class="summary-label">Phase</div><div class="summary-value">{{ quotation.get_phase_display }}</div></div>
             <div class="summary-item"><div class="summary-label">System Type</div><div class="summary-value">{{ quotation.get_system_type_display }}</div></div>
-            <div class="summary-item"><div class="summary-label">Structure</div><div class="summary-value">{% if structure_kind == "roof" %}Roof Mounted{% elif structure_kind == "gp" %}GP{% elif structure_kind == "gi" %}GI{% else %}{{ quotation.structure_type }}{% endif %}</div></div>
+            <div class="summary-item"><div class="summary-label">Structure</div><div class="summary-value">{% if structure_kind == "roof" %}Roof Mounted{% elif structure_kind == "gp" %}GP{% elif structure_kind == "gi" %}{% if "TATA" in quotation.structure_type|upper %}TATA GI{% else %}GI{% endif %}{% else %}{{ quotation.structure_type }}{% endif %}</div></div>
             <div class="summary-item"><div class="summary-label">Panel Type</div><div class="summary-value">{{ quotation.get_panel_dcr_status_display }}</div></div>
             <div class="summary-item"><div class="summary-label">Date</div><div class="summary-value">{{ quotation.date|date:"d/m/Y" }}</div></div>
             <div class="summary-item"><div class="summary-label">Validity</div><div class="summary-value">{{ quotation.validity_days }} days</div></div>
@@ -265,9 +265,10 @@
                 <select name="inverter_kw" id="inverter_kw">
                     <option value="">Select Inverter KW</option>
                     <option value="3" {% if quotation.inverter_kw|floatformat:"-2" == "3" %}selected{% endif %}>3 kW</option>
+                    <option value="4" {% if quotation.inverter_kw|floatformat:"-2" == "4" %}selected{% endif %}>4 kW</option>
                     <option value="5" {% if quotation.inverter_kw|floatformat:"-2" == "5" %}selected{% endif %}>5 kW</option>
                     <option value="8" {% if quotation.inverter_kw|floatformat:"-2" == "8" %}selected{% endif %}>8 kW</option>
-                    {% if quotation.inverter_kw and quotation.inverter_kw|floatformat:"-2" != "3" and quotation.inverter_kw|floatformat:"-2" != "5" and quotation.inverter_kw|floatformat:"-2" != "8" %}
+                    {% if quotation.inverter_kw and quotation.inverter_kw|floatformat:"-2" != "3" and quotation.inverter_kw|floatformat:"-2" != "4" and quotation.inverter_kw|floatformat:"-2" != "5" and quotation.inverter_kw|floatformat:"-2" != "8" %}
                         <option value="{{ quotation.inverter_kw|floatformat:"-2" }}" selected>{{ quotation.inverter_kw|floatformat:"-2" }} kW (saved)</option>
                     {% endif %}
                 </select>

@@ -79,10 +79,11 @@ MANUAL_PANELS_WARN_PERCENT = Decimal("20")
 
 # Predefined BOS (balance of system) amount added ONCE to every quotation's cost.
 # It replaces the individual BOS rows (sockets, glands, clamps ...), which are never added.
-# The amount depends on the plant size (kW) and the phase:  3 kW 10,000 | 5 kW 1-phase 12,000 | 5 kW 3-phase 15,000 | 8 kW 15,000.
+# The amount depends on the plant size (kW) and the phase:  3 kW 10,000 | 4 kW 10,000 | 5 kW 1-phase 12,000 | 5 kW 3-phase 15,000 | 8 kW 15,000.
 # key = (kW, "1PH" / "3PH" / None);  None = any phase.  A size that is not listed uses BOS_FIXED_AMOUNT.
 BOS_AMOUNTS = {
     (Decimal("3"), None): Decimal("10000"),
+    (Decimal("4"), None): Decimal("10000"),          # 4 kW uses the 3 kW BOS amount (change this number to change it)
     (Decimal("5"), "1PH"): Decimal("12000"),
     (Decimal("5"), "3PH"): Decimal("15000"),
     (Decimal("8"), None): Decimal("15000"),
@@ -102,6 +103,8 @@ GI_EXTRA_FEET = Decimal("2")       # a GI structure is priced for its selected h
 # Per plant size, the feet added to the selected height (default: GI +2, GP 0).
 # 3 kW only: GI = the selected height itself (4 ft -> 4), GP = the selected height minus 1 (4 ft -> 3).
 STRUCTURE_FEET_ADJUST = {Decimal("3"): {"gi": Decimal("0"), "gp": Decimal("-1")}}
+# TATA GI = the GI calculation above + this fixed amount on the structure material (only when the structure has a height, i.e. it is wanted)
+TATA_GI_EXTRA = Decimal("5000")
 
 # Cable lengths for the two per-metre components that have no box on the page.
 UG_CABLE_METRES = Decimal("30")       # AC UG cable, ACDB to metering panel (the length printed on the sample quotation)
@@ -194,6 +197,8 @@ def parse_structure_kw(raw):
 def structure_kind(value):
     """'Roof Mounted' / 'roof' -> 'roof',  'GP' -> 'gp',  'GI' -> 'gi'  (old and new stored values both work)."""
     text = normalized_text(value).lower()
+    if text.startswith("tata"):
+        return "gi"                       # TATA GI is priced as GI (plus TATA_GI_EXTRA)
     if text.startswith("roof"):
         return "roof"
     if text.startswith("gp"):
@@ -201,6 +206,11 @@ def structure_kind(value):
     if text.startswith("gi"):
         return "gi"
     return ""
+
+
+def is_tata(value):
+    """True for the 'TATA GI' structure: the MAKE column of the PDF then says TATA."""
+    return normalized_text(value).lower().startswith("tata")
 
 
 # =========================================================
@@ -326,7 +336,10 @@ def calculate_structure(quotation, structure_watts):
         feet = ZERO
 
     if structure_watts > 0:
-        return money(feet * structure_watts), money(wage_factor * structure_watts), wage_factor, feet
+        material = money(feet * structure_watts)
+        if is_tata(quotation.structure_type) and material > 0:
+            material = money(material + TATA_GI_EXTRA)
+        return material, money(wage_factor * structure_watts), wage_factor, feet
     return ZERO, ZERO, wage_factor, feet
 
 
@@ -615,7 +628,8 @@ def _compute(quotation):
         _line("loading_charge", "Loading charge", decimal_or_zero(quotation.loading_charge)),
         _line("documentation", "Documentation", decimal_or_zero(quotation.documentation)),
     ]
-    structure_note = "%s ft x %s W%s" % (plain_number(feet), plain_number(structure_watts), " (structure kW entered by hand)" if structure_is_manual else "")
+    structure_note = "%s ft x %s W%s%s" % (plain_number(feet), plain_number(structure_watts), " (structure kW entered by hand)" if structure_is_manual else "",
+                                          " + Rs %s TATA GI" % plain_number(TATA_GI_EXTRA) if is_tata(quotation.structure_type) and structure_material > 0 else "")
 
     # ---- 12. TOTAL COST = the selection (with the structure and its wage) + BOS + the prefixed non-taxables ----
     lines = [_line("panel", "Solar panels", panel_value, panel_note)] + lines_components + [

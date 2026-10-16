@@ -25,4 +25,5 @@ urlpatterns = [
     path("rates/unlock/", views.unlock_rates, name="unlock_rates"),
     path("rates/lock/", views.lock_rates, name="lock_rates"),
     path("pdf/<int:quotation_id>/<str:filename>", views.quotation_pdf, name="quotation_pdf_named"),
+    path("view/<int:quotation_id>/<str:filename>", views.quotation_pdf_view, name="quotation_pdf_view"),
 ]

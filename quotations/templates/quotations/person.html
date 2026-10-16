@@ -191,7 +191,7 @@
 
             <div class="links">
                 <a href="{% url 'quotation_detail' item.id %}">Open</a>
-                <a href="{% url 'quotation_pdf_named' item.id item.pdf_name %}">PDF</a>
+                <a href="{% url 'quotation_pdf_view' item.id item.pdf_name %}">PDF</a>
                 <a href="{% url 'create_quotation' %}?from={{ item.id }}">+ Quote again</a>
             </div>
             <div class="noprint" style="margin-top:12px;padding-top:10px;border-top:1px solid #e5e7eb">
@@ -223,7 +223,7 @@
                     <small>{{ other.category }} · {{ other.date }}</small>
                     <div class="links">
                         <a href="{% url 'quotation_detail' other.id %}">Open</a>
-                        <a href="{% url 'quotation_pdf_named' other.id other.pdf_name %}">PDF</a>
+                        <a href="{% url 'quotation_pdf_view' other.id other.pdf_name %}">PDF</a>
                     </div>
                     <form method="post" action="{% url 'set_counted' other.id %}" style="margin-top:6px">
                         {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">

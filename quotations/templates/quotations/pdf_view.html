@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{ pdf_name }}</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e5e7eb; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .bar { position: sticky; top: 0; z-index: 5; display: flex; gap: 10px; align-items: center;
+         padding: calc(10px + env(safe-area-inset-top)) 14px 10px; background: #fff; border-bottom: 1px solid #d1d5db; }
+  .bar .name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btn { border: 0; border-radius: 8px; padding: 10px 14px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; }
+  .back { background: #e5e7eb; color: #111827; }
+  .share { background: #3B73B9; color: #fff; }
+  .share:disabled { opacity: .6; }
+  #pages { padding: 10px 8px calc(20px + env(safe-area-inset-bottom)); }
+  #pages canvas { display: block; width: 100%; height: auto; margin: 0 auto 10px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); max-width: 900px; }
+  #msg { text-align: center; padding: 30px 16px; color: #374151; font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <a class="btn back" href="javascript:void(0)" onclick="goBack()">&larr; Back</a>
+  <div class="name">{{ pdf_name }}</div>
+  <button class="btn share" id="share" type="button">Share / Save</button>
+</div>
+<div id="msg">Loading the PDF...</div>
+<div id="pages"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+var PDF_URL = "{{ pdf_url|escapejs }}";
+var PDF_NAME = "{{ pdf_name|escapejs }}";
+if (!/\.pdf$/i.test(PDF_NAME)) PDF_NAME += ".pdf";
+var blobPromise = null;
+
+function goBack() {
+  if (document.referrer && history.length > 1) history.back(); else location.href = "/";
+}
+function getBlob() {
+  if (!blobPromise) blobPromise = fetch(PDF_URL + "?t=" + Date.now()).then(function (r) {
+    if (!r.ok) throw new Error("PDF " + r.status);
+    return r.blob();
+  });
+  return blobPromise;
+}
+
+document.getElementById("share").addEventListener("click", async function () {
+  var btn = this, label = btn.textContent;
+  btn.disabled = true; btn.textContent = "Preparing...";
+  try {
+    var blob = await getBlob();
+    var file = new File([blob], PDF_NAME, {type: "application/pdf"});
+    if (navigator.canShare && navigator.canShare({files: [file]})) {
+      await navigator.share({files: [file], title: PDF_NAME});
+    } else {
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = PDF_NAME;
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+  } catch (e) {
+    if (!e || e.name !== "AbortError") alert("Could not share the PDF. Please try again.");
+  }
+  btn.disabled = false; btn.textContent = label;
+});
+
+(async function () {
+  var msg = document.getElementById("msg"), box = document.getElementById("pages");
+  try {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    var buf = await (await getBlob()).arrayBuffer();
+    var pdf = await pdfjsLib.getDocument({data: buf}).promise;
+    var scale = Math.min(2.5, (window.devicePixelRatio || 1) * 1.4);
+    for (var n = 1; n <= pdf.numPages; n++) {
+      var page = await pdf.getPage(n);
+      var vp = page.getViewport({scale: scale});
+      var c = document.createElement("canvas");
+      c.width = vp.width; c.height = vp.height;
+      box.appendChild(c);
+      await page.render({canvasContext: c.getContext("2d"), viewport: vp}).promise;
+      if (n === 1) msg.style.display = "none";
+    }
+  } catch (e) {
+    msg.innerHTML = 'Could not show the PDF here. <a href="' + PDF_URL + '">Open it directly</a>.';
+  }
+})();
+</script>
+</body>
+</html>

@@ -560,6 +560,16 @@ def quotation_pdf(request, quotation_id, filename=None):
     return response
 
 
+def quotation_pdf_view(request, quotation_id, filename):
+    """The PDF inside our own page, with a Back button and a Share / Save button.
+    (An installed phone app has no browser menu, and the phone's plain PDF viewer has no share button.)"""
+    get_object_or_404(Quotation, id=quotation_id)
+    return render(request, "quotations/pdf_view.html", {
+        "pdf_url": reverse("quotation_pdf_named", args=[quotation_id, filename]),
+        "pdf_name": filename,
+    })
+
+
 # =========================================================
 # DASHBOARD
 # =========================================================

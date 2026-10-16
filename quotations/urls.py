@@ -18,6 +18,7 @@ urlpatterns = [
     path("offline/", pwa_views.offline, name="offline"),
     path("search/", views.search, name="search"),
     path("api/materials/", views.materials_api, name="materials_api"),
+    path("api/materials/estimate/", views.materials_estimate, name="materials_estimate"),
     path("quotation/<int:quotation_id>/customer/", views.confirm_customer, name="confirm_customer"),
     path("customer/confirm/", views.confirm_customer, name="confirm_customer_choice"),
     path("quotation/<int:quotation_id>/counted/", views.set_counted, name="set_counted"),

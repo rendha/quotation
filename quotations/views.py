@@ -26,6 +26,7 @@ from .calculations import (
     calculate_panel_quantity,
     parse_manual_panels,
     parse_structure_kw,
+    _compute,
     calculate_quotation,
     clean_text,
     decimal_or_zero,
@@ -651,6 +652,94 @@ def materials_api(request):
     query = request.GET.get("q", "").strip()
     found = [q for q in Quotation.objects.filter(is_customer=True).order_by("-created_at")[:500] if not query or stats.matches(stats.search_text(q), query)]
     return JsonResponse({"quotations": [header(q) for q in found[:30]]})
+
+
+class _EstimateDone(Exception):
+    """Raised on purpose to roll the estimate quotation back: nothing of it is kept."""
+
+
+def _pick_panel(company, watts, watts_max, panel_type, dcr):
+    """The panel of the rate sheet for what a PDF says: the brand, the watts (a range such as 600-620 takes the highest inside it) and,
+    when given, the technology (TOPCon ...) and DCR."""
+    options = PanelOption.objects.filter(is_active=True)
+    if company:
+        options = options.filter(company__icontains=company.strip())
+    if panel_type:
+        narrowed = options.filter(panel_type__icontains=panel_type.strip())
+        options = narrowed if narrowed.exists() else options
+    if dcr in ("dcr", "non_dcr"):
+        narrowed = options.filter(dcr_status=dcr)
+        options = narrowed if narrowed.exists() else options
+    options = list(options)
+    if not options:
+        return None
+    if not watts:
+        return None if len(options) > 1 else options[0]
+    low, high = watts, (watts_max or watts)
+    inside = [p for p in options if low <= Decimal(p.wattage) <= high]
+    if inside:
+        return max(inside, key=lambda p: Decimal(p.wattage))
+    return min(options, key=lambda p: abs(Decimal(p.wattage) - high))
+
+
+@login_not_required
+def materials_estimate(request):
+    """
+    The REVERSE of a quotation, for a quotation that was not made here: the materials website sends only the specifications it read
+    from the other quotation, and gets back the same data as /api/materials/?id=  (the material list with this app's rates, the structure
+    wage and the electrical work), worked out with this app's own rules.  Nothing is saved.   Needs the X-API-Key header.
+        /api/materials/estimate/?system_size=5&phase=single&panel_company=adani&panel_watts=620&panel_quantity=5&inverter_kw=5
+                                 &structure=roof&dc_cable_m=50&ac_wire_m=20
+    Also: panel_watts_max (a range 600-620), panel_type (topcon), dcr (dcr / non_dcr), structure_feet, dc_cable_sqmm.
+    """
+    expected = os.environ.get("MATERIALS_API_KEY", "")
+    given = request.headers.get("X-API-Key", "")
+    if not expected or not hmac.compare_digest(expected.encode(), given.encode()):
+        raise Http404()
+
+    get = request.GET
+
+    def number(key):
+        try:
+            value = Decimal(str(get.get(key, "")).strip())
+            return value if value > 0 else None
+        except Exception:
+            return None
+
+    size = number("system_size")
+    if size is None:
+        return JsonResponse({"error": "system_size (kW) is needed."}, status=400)
+    phase = "three" if get.get("phase", "").strip().lower().startswith(("3", "three")) else "single"
+    structure = get.get("structure", "roof").strip().lower()
+    structure = structure if structure in ("roof", "gp", "gi") else "roof"
+    panel = _pick_panel(get.get("panel_company", ""), number("panel_watts"), number("panel_watts_max"), get.get("panel_type", ""), get.get("dcr", ""))
+    panels = number("panel_quantity")
+    sqmm = number("dc_cable_sqmm")
+
+    result = {}
+    try:
+        with transaction.atomic():
+            quotation = Quotation.objects.create(
+                offer_no="ESTIMATE-%s" % timezone.now().strftime("%Y%m%d%H%M%S%f"), business_name="Estimate", location="-",
+                phase=phase, system_size=size, system_type="on_grid", capacity=plain_number(size), date=timezone.localdate(),
+                panel_dcr_status=panel.dcr_status if panel is not None else "dcr", structure_type=structure, structure_feet=number("structure_feet"),
+                panel_option=panel, panel_quantity_manual=int(panels) if panels else None, inverter_kw=number("inverter_kw"),
+                dc_cable=("%s SQMM" % plain_number(sqmm)) if sqmm else "",
+                dc_cable_quantity=number("dc_cable_m") or Decimal("30"), ac_wire_quantity=number("ac_wire_m") or Decimal("20"),
+                electrical_work=Decimal("8000"), structure_work=Decimal("0"), transportation_travel=Decimal("2000"),
+                kseb_fee=Decimal("4720"), loading_charge=Decimal("1000"), documentation=Decimal("2500"))
+            computed = _compute(quotation)
+            result = {"id": "", "offer_no": "", "business_name": "", "customer_name": "", "phone": "", "location": "",
+                      "system_size": str(size), "date": "", "items": material_list(quotation),
+                      "panel_used": str(panel) if panel is not None else "", "warnings": computed["warnings"],
+                      "price_estimate": str(computed["final_price"])}
+            result.update(labour_amounts(quotation))
+            raise _EstimateDone
+    except _EstimateDone:
+        pass
+    except Exception as problem:
+        return JsonResponse({"error": "%s: %s" % (type(problem).__name__, problem)}, status=500)
+    return JsonResponse(result)
 
 
 def confirm_customer(request, quotation_id=None):

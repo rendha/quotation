@@ -233,6 +233,11 @@
                            {% if posted.structure == "TATA GI" %}checked{% endif %}>
                     <label for="tata_gi">TATA GI</label>
                 </div>
+                <div class="option">
+                    <input type="radio" id="no_structure" name="structure" value="No structure"
+                           {% if posted.structure == "No structure" %}checked{% endif %}>
+                    <label for="no_structure">No structure</label>
+                </div>
             </div>
 
             <!-- SYSTEM TYPE -->

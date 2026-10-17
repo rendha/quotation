@@ -197,6 +197,8 @@ def parse_structure_kw(raw):
 def structure_kind(value):
     """'Roof Mounted' / 'roof' -> 'roof',  'GP' -> 'gp',  'GI' -> 'gi'  (old and new stored values both work)."""
     text = normalized_text(value).lower()
+    if text.startswith("no ") or text in ("none", "no"):
+        return "none"                     # "No structure": the site does not need one - no material, no wage, no PDF row text
     if text.startswith("tata"):
         return "gi"                       # TATA GI is priced as GI (plus TATA_GI_EXTRA)
     if text.startswith("roof"):
@@ -325,6 +327,8 @@ def calculate_structure(quotation, structure_watts):
     wage_factor = get_structure_wage_factor(quotation.system_size)
     kind = structure_kind(quotation.structure_type)
     selected_feet = decimal_or_zero(quotation.structure_feet)
+    if kind == "none":
+        return ZERO, ZERO, wage_factor, ZERO          # no structure: no material and no wage
 
     if kind == "roof":
         feet = ROOF_FIXED_FEET
@@ -618,6 +622,8 @@ def _compute(quotation):
     previous_calculated_wage = Decimal(quotation.structure_wage or 0)
     wage_is_manual = stored_work != 0 and stored_work != previous_calculated_wage
     structure_work = money(stored_work) if wage_is_manual else calculated_wage
+    if structure_kind(quotation.structure_type) == "none":
+        structure_work = ZERO                          # no structure: nothing is paid for it, even if a wage was typed earlier
 
     # ---- 11. ADDITIONAL CHARGES (structure_work is the wage above) --------------------------------------
     kseb_fee = money(inverter_kw * KSEB_FEE_PER_INVERTER_KW)
@@ -797,4 +803,5 @@ def material_list(quotation):
 def labour_amounts(quotation):
     """The structure wage and the electrical work of a quotation (what the quotation allows for them), for the materials website."""
     r = _compute(quotation)
-    return {"structure_wage": str(money(r["structure_work"])), "electrical_work": str(money(decimal_or_zero(quotation.electrical_work)))}
+    return {"structure_wage": str(money(r["structure_work"])), "electrical_work": str(money(decimal_or_zero(quotation.electrical_work))),
+            "final_price": str(money(r["final_price"]))}       # what the customer pays (with GST): the accounts person works from it

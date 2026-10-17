@@ -220,6 +220,8 @@ def _row_inverter(q, item, row):
 
 def _row_structure(q, item, row):
     kind = structure_kind(q.structure_type)
+    if kind == "none":
+        return {"spec": "Mounting structure is not included in this quotation", "qty": "-", "make": "-"}
     spec = row["spec"]
     title = {"roof": "RCC Roof Structure", "gp": "GP Structure", "gi": "GI Structure"}.get(kind)
     if title:

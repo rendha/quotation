@@ -721,7 +721,7 @@ def materials_estimate(request):
         return JsonResponse({"error": "system_size (kW) is needed."}, status=400)
     phase = "three" if get.get("phase", "").strip().lower().startswith(("3", "three")) else "single"
     structure = get.get("structure", "roof").strip().lower().replace("_", " ").replace("-", " ")
-    structure = "TATA GI" if structure == "tata gi" else (structure if structure in ("roof", "gp", "gi") else "roof")
+    structure = "TATA GI" if structure == "tata gi" else ("No structure" if structure in ("none", "no", "no structure") else (structure if structure in ("roof", "gp", "gi") else "roof"))
     panel = _pick_panel(get.get("panel_company", ""), number("panel_watts"), number("panel_watts_max"), get.get("panel_type", ""), get.get("dcr", ""))
     panels = number("panel_quantity")
     sqmm = number("dc_cable_sqmm")

@@ -160,10 +160,10 @@
             color: #6b7280;
         }
 
-        .stats.three .stat, .person-stats.three > div { width: 33.33%; }
+        .stats.five .stat, .person-stats.five > div { width: 20%; }
 
         @media (max-width: 640px) {
-            .stat, .person-stats > div, .stats.three .stat, .person-stats.three > div {
+            .stat, .person-stats > div, .stats.five .stat, .person-stats.five > div {
                 width: 50%;
             }
             .person-stats > div {
@@ -214,10 +214,14 @@
     </form>
 
     <!-- TOTAL OF EVERYBODY -->
-    <div class="stats{% if not show_rates %} three{% endif %}">
+    <div class="stats{% if show_rates %} five{% endif %}">
         <div class="stat"><div class="stat-card">
             <div class="stat-number">{{ totals.count }}</div>
             <div class="stat-label">Total quotations</div>
+        </div></div>
+        <div class="stat"><div class="stat-card">
+            <div class="stat-number">{{ totals.clients }}</div>
+            <div class="stat-label">Customers</div>
         </div></div>
         <div class="stat"><div class="stat-card">
             <div class="stat-number">{{ totals.kw_display }}</div>
@@ -249,8 +253,9 @@
                     <span>see details &rsaquo;</span>
                 </div>
 
-                <div class="person-stats{% if not show_rates %} three{% endif %}">
+                <div class="person-stats{% if show_rates %} five{% endif %}">
                     <div><b>{{ person.count }}</b><small>Quotations</small></div>
+                    <div><b>{{ person.clients }}</b><small>Customers</small></div>
                     <div><b>{{ person.kw_display }}</b><small>Total kW</small></div>
                     <div><b>{{ person.value_display }}</b><small>Total value</small></div>
                     {% if show_rates %}<div><b class="{% if person.profit_negative %}loss{% endif %}">{{ person.profit_display }}</b><small>Total profit</small></div>{% endif %}

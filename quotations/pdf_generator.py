@@ -226,6 +226,8 @@ def _row_structure(q, item, row):
     title = {"roof": "RCC Roof Structure", "gp": "GP Structure", "gi": "GI Structure"}.get(kind)
     if title:
         spec = spec.replace("RCC Roof Structure", title)
+        if kind == "gp":
+            spec = spec.replace("GI pipe", "GP pipe")                 # a GP structure is made of GP pipe
     feet = Decimal("2") if kind == "roof" else q.structure_feet
     if _positive(feet):
         spec = spec.replace("Height: 1.2M", "Height: %s FT" % L.fmt_num(feet))

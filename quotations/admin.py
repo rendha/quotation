@@ -38,6 +38,8 @@ class ProductAdmin(admin.ModelAdmin):
 class QuotationAdmin(admin.ModelAdmin):
     list_display = (
         'offer_no',
+        'customer_name',
+        'is_customer',
         'business_name',
         'location',
         'capacity',
@@ -47,11 +49,14 @@ class QuotationAdmin(admin.ModelAdmin):
 
     search_fields = (
         'offer_no',
-        'buisness_name',
+        'customer_name',
+        'business_name',
+        'phone',
         'location',
     )
 
     list_filter = (
+        'is_customer',
         'category',
         'date',
     )

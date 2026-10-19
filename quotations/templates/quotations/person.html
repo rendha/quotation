@@ -116,10 +116,10 @@
             font-size: 14px;
         }
 
-        .stats.three .stat { width: 33.33%; }
+        .stats.five .stat { width: 20%; }
 
         @media (max-width: 640px) {
-            .stat, .stats.three .stat {
+            .stat, .stats.five .stat {
                 width: 50%;
             }
         }
@@ -142,10 +142,14 @@
 
 <div class="container">
 
-    <div class="stats{% if not show_rates %} three{% endif %}">
+    <div class="stats{% if show_rates %} five{% endif %}">
         <div class="stat"><div class="stat-card">
             <div class="stat-number">{{ totals.count }}</div>
             <div class="stat-label">Total quotations</div>
+        </div></div>
+        <div class="stat"><div class="stat-card">
+            <div class="stat-number">{{ totals.clients }}</div>
+            <div class="stat-label">Customers</div>
         </div></div>
         <div class="stat"><div class="stat-card">
             <div class="stat-number">{{ totals.kw_display }}</div>

@@ -182,8 +182,8 @@
 
         <div class="form-grid" style="margin-top:20px">
             <div class="field">
-                <label for="customer_name">Quotation For (person)</label>
-                <input type="text" id="customer_name" name="customer_name" value="{{ quotation.customer_name }}"
+                <label for="customer_name">Quotation For (person) *</label>
+                <input type="text" id="customer_name" name="customer_name" required value="{{ quotation.customer_name }}"
                        placeholder="e.g. Imran" list="people-names" autocomplete="off">
                 <datalist id="people-names">
                     {% for name in people_names %}<option value="{{ name }}">{% endfor %}
@@ -191,7 +191,7 @@
             </div>
             <div class="field">
                 <label for="phone">Phone</label>
-                <input type="tel" id="phone" name="phone" value="{{ quotation.phone }}">
+                <input type="tel" id="phone" name="phone" required value="{{ quotation.phone }}">
             </div>
             <div class="field">
                 <label for="email">Email</label>
@@ -214,7 +214,7 @@
         <div class="form-grid">
             <div class="field">
                 <label for="panel_option">Panel</label>
-                <select name="panel_option" id="panel_option" onchange="calculatePanelQuantity()">
+                <select name="panel_option" id="panel_option" required onchange="calculatePanelQuantity()">
                     <option value="">Select Panel</option>
                     {% for panel in panel_options %}
                         <option value="{{ panel.id }}"
@@ -262,7 +262,7 @@
         <div class="form-grid">
             <div class="field">
                 <label for="inverter_kw">Inverter Capacity</label>
-                <select name="inverter_kw" id="inverter_kw">
+                <select name="inverter_kw" id="inverter_kw" required>
                     <option value="">Select Inverter KW</option>
                     <option value="3" {% if quotation.inverter_kw|floatformat:"-2" == "3" %}selected{% endif %}>3 kW</option>
                     <option value="4" {% if quotation.inverter_kw|floatformat:"-2" == "4" %}selected{% endif %}>4 kW</option>
@@ -276,7 +276,7 @@
 
             <div class="field">
                 <label for="inverter_type">Inverter</label>
-                <select name="inverter_type" id="inverter_type" onchange="toggleOtherInverter()">
+                <select name="inverter_type" id="inverter_type" required onchange="toggleOtherInverter()">
                     <option value="">Select Inverter</option>
                     {% for product in inverter_products %}
                         <option value="{{ product.name }}" {% if quotation.inverter_type == product.name %}selected{% endif %}>
@@ -313,7 +313,7 @@
         <div class="form-grid">
             <div class="field">
                 <label for="dc_cable">DC Cable</label>
-                <select name="dc_cable" id="dc_cable">
+                <select name="dc_cable" id="dc_cable" required>
                     <option value="">Select DC Cable</option>
                     {% for product in dc_cable_products %}
                         <option value="{{ product.name }}" {% if quotation.dc_cable == product.name %}selected{% endif %}>
@@ -329,7 +329,7 @@
 
             <div class="field">
                 <label for="dc_cable_quantity">Length (metres)</label>
-                <input type="number" id="dc_cable_quantity" name="dc_cable_quantity" value="{{ quotation.dc_cable_quantity|floatformat:"-2" }}" step="0.01" min="0">
+                <input type="number" id="dc_cable_quantity" name="dc_cable_quantity" required value="{{ quotation.dc_cable_quantity|floatformat:"-2" }}" step="0.01" min="0">
             </div>
         </div>
     </div>
@@ -344,7 +344,7 @@
         <div class="form-grid">
             <div class="field">
                 <label for="ac_wire">AC Wire &mdash; FR Copper</label>
-                <select name="ac_wire" id="ac_wire">
+                <select name="ac_wire" id="ac_wire" required>
                     <option value="">Select AC Wire</option>
                     {% for product in ac_wire_products %}
                         <option value="{{ product.name }}" {% if quotation.ac_wire == product.name %}selected{% endif %}>
@@ -361,7 +361,7 @@
 
             <div class="field">
                 <label for="ac_wire_quantity">Length (metres)</label>
-                <input type="number" id="ac_wire_quantity" name="ac_wire_quantity" value="{{ quotation.ac_wire_quantity|floatformat:"-2" }}" step="0.01" min="0">
+                <input type="number" id="ac_wire_quantity" name="ac_wire_quantity" required value="{{ quotation.ac_wire_quantity|floatformat:"-2" }}" step="0.01" min="0">
             </div>
         </div>
     </div>
@@ -381,7 +381,7 @@
             <div class="height-section">
                 <div class="field">
                     <label for="structure_height">Structure Height {% if structure_kind == "gi" %}<span class="hint">({% if quotation.system_size|floatformat:"-2" == "3" %}GI is calculated on the selected height{% else %}GI is calculated as selected height plus 2 FT{% endif %})</span>{% elif structure_kind == "gp" and quotation.system_size|floatformat:"-2" == "3" %}<span class="hint">(GP is calculated as selected height minus 1 FT)</span>{% endif %}</label>
-                    <select name="structure_height" id="structure_height" onchange="toggleCustomHeight()">
+                    <select name="structure_height" id="structure_height" required onchange="toggleCustomHeight()">
                         <option value="">Select Height</option>
                         <option value="4" {% if quotation.structure_feet == 4 %}selected{% endif %}>4 FT</option>
                         <option value="6" {% if quotation.structure_feet == 6 %}selected{% endif %}>6 FT</option>
@@ -438,7 +438,7 @@
         <div class="form-grid">
             <div class="field">
                 <label for="electrical_work">Electrical Work</label>
-                <input type="number" id="electrical_work" name="electrical_work" step="0.01" value="{{ quotation.electrical_work|floatformat:"-2" }}">
+                <input type="number" id="electrical_work" name="electrical_work" required step="0.01" value="{{ quotation.electrical_work|floatformat:"-2" }}">
             </div>
 
             <div class="field">
@@ -448,22 +448,22 @@
 
             <div class="field">
                 <label for="transportation_travel">Transportation / Travel</label>
-                <input type="number" id="transportation_travel" name="transportation_travel" step="0.01" value="{{ quotation.transportation_travel|floatformat:"-2" }}">
+                <input type="number" id="transportation_travel" name="transportation_travel" required step="0.01" value="{{ quotation.transportation_travel|floatformat:"-2" }}">
             </div>
 
             <div class="field">
                 <label for="kseb_fee">KSEB Fee</label>
-                <input type="number" id="kseb_fee" name="kseb_fee" step="0.01" value="{{ quotation.kseb_fee|floatformat:"-2" }}">
+                <input type="number" id="kseb_fee" name="kseb_fee" required step="0.01" value="{{ quotation.kseb_fee|floatformat:"-2" }}">
             </div>
 
             <div class="field">
                 <label for="loading_charge">Loading Charge</label>
-                <input type="number" id="loading_charge" name="loading_charge" step="0.01" value="{{ quotation.loading_charge|floatformat:"-2" }}">
+                <input type="number" id="loading_charge" name="loading_charge" required step="0.01" value="{{ quotation.loading_charge|floatformat:"-2" }}">
             </div>
 
             <div class="field">
                 <label for="documentation">Documentation</label>
-                <input type="number" id="documentation" name="documentation" step="0.01" value="{{ quotation.documentation|floatformat:"-2" }}">
+                <input type="number" id="documentation" name="documentation" required step="0.01" value="{{ quotation.documentation|floatformat:"-2" }}">
             </div>
         </div>
     </div>

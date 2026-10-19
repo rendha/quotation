@@ -361,6 +361,42 @@ def _quantity_from_post(request, name, current):
     return value if value >= 0 else current
 
 
+def _missing_fields(request, quotation):
+    """The names of the quotation-page fields that were left empty (or a length of 0).  Email and address stay optional."""
+    post = request.POST
+
+    def empty(name):
+        return not clean_text(post.get(name))
+
+    def zero(name):
+        return decimal_or_zero(post.get(name)) <= 0
+
+    missing = []
+    for name, label in (("customer_name", "Quotation For (person)"), ("phone", "Phone"), ("panel_option", "Panel"),
+                        ("inverter_kw", "Inverter capacity"), ("inverter_type", "Inverter"), ("dc_cable", "DC cable"), ("ac_wire", "AC wire")):
+        if empty(name):
+            missing.append(label)
+    if zero("dc_cable_quantity"):
+        missing.append("DC cable length")
+    if zero("ac_wire_quantity"):
+        missing.append("AC wire length")
+    if clean_text(post.get("inverter_type")).lower() == "other":
+        if not clean_text(post.get("other_inverter_name") or post.get("other_inverter")):
+            missing.append("Inverter name")
+        if zero("other_inverter_rate"):
+            missing.append("Inverter rate")
+    if structure_kind(quotation.structure_type) in ("gp", "gi"):
+        if empty("structure_height"):
+            missing.append("Structure height")
+        elif clean_text(post.get("structure_height")) == "other" and zero("custom_height"):
+            missing.append("Structure height (FT)")
+    for name, label in (("electrical_work", "Electrical work"), ("transportation_travel", "Transportation / travel"), ("kseb_fee", "KSEB fee"),
+                        ("loading_charge", "Loading charge"), ("documentation", "Documentation")):
+        if name in post and empty(name):
+            missing.append(label)
+    return missing
+
+
 @transaction.atomic
 def quotation_detail(request, quotation_id):
 
@@ -380,6 +416,11 @@ def quotation_detail(request, quotation_id):
     # POST: save what the user chose, then calculate once
     # =====================================================
     if request.method == "POST":
+
+        # ---- every field must be filled in (a blank or zero value is refused before anything is saved) ----
+        missing = _missing_fields(request, quotation)
+        if missing:
+            return HttpResponseBadRequest("Please fill in: " + ", ".join(missing) + ". Go back, fill them in and press Save again.")
 
         # ---- panel (quantity = the nearest whole number of system size / wattage) ----
         panel_option_id = clean_text(request.POST.get("panel_option"))

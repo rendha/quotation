@@ -204,6 +204,8 @@
         + NEW QUOTATION
     </a>
 
+    {% if show_rates %}<p style="margin:10px 0"><a href="{% url 'daily_report' %}" style="color:#3B73B9;font-weight:bold">Daily report: who made how many quotations today &rsaquo;</a></p>{% endif %}
+
     <!-- SEARCH: typing narrows the people below at once; Enter / Search looks through ALL quotations -->
     {% url 'search' as search_url %}
     <form class="search-form" method="get" action="{{ search_url }}">

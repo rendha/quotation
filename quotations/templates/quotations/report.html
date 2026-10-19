@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dehlsen Energy - Daily report</title>
+    {% include "quotations/_pwa_head.html" %}
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, sans-serif; background: #f4f7fb; color: #1f2937; }
+        .header { background: #3B73B9; color: white; padding: 22px; }
+        .header h1 { margin: 0; font-size: 22px; }
+        .container { max-width: 900px; margin: auto; padding: 20px; }
+        .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+        .nav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+        .nav a, .nav button { background: white; border: 1px solid #cbd5e1; color: #1f2937; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-size: 14px; cursor: pointer; }
+        .nav a.on { background: #3B73B9; color: white; border-color: #3B73B9; }
+        .nav input { padding: 7px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+        .stat .l { color: #64748b; font-size: 12px; } .stat .v { font-size: 22px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+        th { color: #64748b; font-size: 12px; text-transform: uppercase; }
+        .r { text-align: right; } .muted { color: #64748b; font-size: 13px; }
+        .tablebox { overflow-x: auto; }
+        a { color: #3B73B9; }
+        h2 { font-size: 17px; margin: 18px 0 8px; }
+        .neg { color: #b91c1c; }
+    </style>
+</head>
+<body>
+<div class="header"><h1>Daily report</h1></div>
+<div class="container">
+    <p><a href="{% url 'quotation_dashboard' %}">&larr; Quotations</a></p>
+
+    <form class="nav" method="get">
+        <a href="?date={{ previous|date:'Y-m-d' }}">&lsaquo; Previous day</a>
+        <a href="?date={{ today|date:'Y-m-d' }}" class="{% if is_today %}on{% endif %}">Today</a>
+        <a href="?date={{ yesterday|date:'Y-m-d' }}" class="{% if single and first == yesterday %}on{% endif %}">Yesterday</a>
+        {% if next %}<a href="?date={{ next|date:'Y-m-d' }}">Next day &rsaquo;</a>{% endif %}
+        <input type="date" name="from" value="{{ first|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}">
+        <span class="muted">to</span>
+        <input type="date" name="to" value="{{ last|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}">
+        <button type="submit">Show</button>
+    </form>
+
+    <div class="card">
+        <div class="muted">{% if single %}{{ first|date:"l, d F Y" }}{% else %}{{ first|date:"d M Y" }} to {{ last|date:"d M Y" }}{% endif %}</div>
+        <div class="stats" style="margin-top:8px">
+            <div class="stat"><div class="l">Quotations made</div><div class="v">{{ totals.count }}</div></div>
+            <div class="stat"><div class="l">Clients</div><div class="v">{{ totals.clients }}</div></div>
+            <div class="stat"><div class="l">Total kW</div><div class="v">{{ totals.kw_display }}</div></div>
+            <div class="stat"><div class="l">Value</div><div class="v">{{ totals.value_display }}</div></div>
+            <div class="stat"><div class="l">Profit</div><div class="v {% if totals.profit_negative %}neg{% endif %}">{{ totals.profit_display }}</div></div>
+        </div>
+    </div>
+
+    <h2>By person</h2>
+    <div class="card tablebox">
+        <table>
+            <thead><tr><th>Person</th><th class="r">Quotations</th><th class="r">kW</th><th class="r">Value</th><th class="r">Profit</th></tr></thead>
+            <tbody>
+            {% for p in people %}
+                <tr><td><b>{{ p.name }}</b></td><td class="r">{{ p.count }}</td><td class="r">{{ p.kw_display }}</td><td class="r">{{ p.value_display }}</td><td class="r {% if p.profit_negative %}neg{% endif %}">{{ p.profit_display }}</td></tr>
+            {% empty %}
+                <tr><td colspan="5" class="muted">No quotation was made on this day.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h2>All quotations</h2>
+    <div class="card tablebox">
+        <table>
+            <thead><tr><th>Time</th>{% if not single %}<th>Date</th>{% endif %}<th>Person</th><th>Customer / business</th><th>Offer no.</th><th class="r">kW</th><th class="r">Price</th></tr></thead>
+            <tbody>
+            {% for x in quotations %}
+                <tr><td>{{ x.time|date:"h:i A" }}</td>{% if not single %}<td>{{ x.time|date:"d M" }}</td>{% endif %}
+                    <td>{{ x.q.customer_name|default:"—" }}</td><td><a href="{% url 'quotation_detail' x.q.id %}">{{ x.q.business_name }}</a></td>
+                    <td class="muted">{{ x.q.offer_no }}</td><td class="r">{{ x.q.system_size }}</td><td class="r">₹{{ x.q.final_quotation_price|floatformat:0 }}</td></tr>
+            {% empty %}
+                <tr><td colspan="7" class="muted">Nothing to show.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+</body>
+</html>

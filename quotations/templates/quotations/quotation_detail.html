@@ -182,8 +182,8 @@
 
         <div class="form-grid" style="margin-top:20px">
             <div class="field">
-                <label for="customer_name">Quotation For (person) *</label>
-                <input type="text" id="customer_name" name="customer_name" required value="{{ quotation.customer_name }}"
+                <label for="customer_name">Quotation For (person)</label>
+                <input type="text" id="customer_name" name="customer_name" value="{{ quotation.customer_name }}"
                        placeholder="e.g. Imran" list="people-names" autocomplete="off">
                 <datalist id="people-names">
                     {% for name in people_names %}<option value="{{ name }}">{% endfor %}
@@ -191,7 +191,7 @@
             </div>
             <div class="field">
                 <label for="phone">Phone</label>
-                <input type="tel" id="phone" name="phone" required value="{{ quotation.phone }}">
+                <input type="tel" id="phone" name="phone" value="{{ quotation.phone }}">
             </div>
             <div class="field">
                 <label for="email">Email</label>

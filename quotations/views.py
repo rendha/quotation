@@ -362,7 +362,7 @@ def _quantity_from_post(request, name, current):
 
 
 def _missing_fields(request, quotation):
-    """The names of the quotation-page fields that were left empty (or a length of 0).  Email and address stay optional."""
+    """The names of the quotation-page fields that were left empty (or a length of 0).  Name, phone, email and address stay optional, as on the first page."""
     post = request.POST
 
     def empty(name):
@@ -372,8 +372,7 @@ def _missing_fields(request, quotation):
         return decimal_or_zero(post.get(name)) <= 0
 
     missing = []
-    for name, label in (("customer_name", "Quotation For (person)"), ("phone", "Phone"), ("panel_option", "Panel"),
-                        ("inverter_kw", "Inverter capacity"), ("inverter_type", "Inverter"), ("dc_cable", "DC cable"), ("ac_wire", "AC wire")):
+    for name, label in (("panel_option", "Panel"), ("inverter_kw", "Inverter capacity"), ("inverter_type", "Inverter"), ("dc_cable", "DC cable"), ("ac_wire", "AC wire")):
         if empty(name):
             missing.append(label)
     if zero("dc_cable_quantity"):

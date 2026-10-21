@@ -213,7 +213,7 @@
 
         <div class="form-grid">
             <div class="field">
-                <label for="panel_option">Panel</label>
+                <label for="panel_option">{% if is_both %}DCR panel{% else %}Panel{% endif %}</label>
                 <select name="panel_option" id="panel_option" required onchange="calculatePanelQuantity()">
                     <option value="">Select Panel</option>
                     {% for panel in panel_options %}
@@ -227,6 +227,34 @@
                 </select>
             </div>
 
+            {% if is_both %}
+            <div class="field">
+                <label for="panel_quantity_manual">Number of DCR panels</label>
+                <input type="number" min="1" max="500" step="1" id="panel_quantity_manual" name="panel_quantity_manual" required
+                       value="{{ quotation.panel_quantity_manual|default_if_none:'' }}" placeholder="How many DCR panels">
+            </div>
+
+            <div class="field">
+                <label for="panel2_option">Non-DCR panel</label>
+                <select name="panel2_option" id="panel2_option" required>
+                    <option value="">Select Non-DCR Panel</option>
+                    {% for panel in panel2_options %}
+                        <option value="{{ panel.id }}"
+                                data-wattage="{{ panel.wattage }}"
+                                data-rate="{{ panel.rate_per_watt }}"
+                                {% if quotation.panel2_option_id == panel.id %}selected{% endif %}>
+                            {{ panel.company }} - {{ panel.panel_type }} - {{ panel.wattage|floatformat:"-2" }}W - {{ panel.get_dcr_status_display }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="panel2_quantity">Number of Non-DCR panels</label>
+                <input type="number" min="1" max="500" step="1" id="panel2_quantity" name="panel2_quantity" required
+                       value="{% if quotation.panel2_quantity %}{{ quotation.panel2_quantity }}{% endif %}" placeholder="How many Non-DCR panels">
+            </div>
+            {% else %}
             <div class="field">
                 <label for="panel_quantity_manual">Number of Panels <span class="hint">(the system calculates it{% if panel_shortfall_percent < 100 %}, never more than {{ panel_shortfall_percent|floatformat:"-2" }}% under the system size{% endif %}; type a number here only to change it)</span></label>
                 {% if can_edit_panels %}
@@ -242,12 +270,13 @@
                 <div class="hint panel-note">To change the number of panels by hand, the new field has to be added to the Quotation model first (see the instructions).</div>
                 {% endif %}
             </div>
+            {% endif %}
         </div>
 
         {% if quotation.panel_option and show_rates %}
         <div class="calc-box">
             <div class="calc-row"><div class="calc-label">Total panel capacity</div><div class="calc-value">{{ quotation.panel_total_watt|floatformat:"-2" }} W</div></div>
-            <div class="calc-row"><div class="calc-label">Panel cost <small>{{ quotation.panel_quantity }} &times; {{ quotation.panel_option.wattage|floatformat:"-2" }} W &times; &#8377;{{ quotation.panel_option.rate_per_watt|floatformat:"-2" }} per watt</small></div><div class="calc-value">&#8377;{{ quotation.panel_base_amount|floatformat:2 }}</div></div>
+            <div class="calc-row"><div class="calc-label">Panel cost <small>{% if is_both %}DCR {{ quotation.panel_quantity }} &times; {{ quotation.panel_option.wattage|floatformat:"-2" }} W &times; &#8377;{{ quotation.panel_option.rate_per_watt|floatformat:"-2" }}{% if quotation.panel2_option %} + Non-DCR {{ quotation.panel2_quantity }} &times; {{ quotation.panel2_option.wattage|floatformat:"-2" }} W &times; &#8377;{{ quotation.panel2_option.rate_per_watt|floatformat:"-2" }}{% endif %} per watt{% else %}{{ quotation.panel_quantity }} &times; {{ quotation.panel_option.wattage|floatformat:"-2" }} W &times; &#8377;{{ quotation.panel_option.rate_per_watt|floatformat:"-2" }} per watt{% endif %}</small></div><div class="calc-value">&#8377;{{ quotation.panel_base_amount|floatformat:2 }}</div></div>
         </div>
         {% endif %}
     </div>
@@ -596,6 +625,7 @@ function toggleCustomHeight() {
 function calculatePanelQuantity() {
     const panelSelect = document.getElementById("panel_option");
     if (!panelSelect) { return; }
+    if ({{ is_both|yesno:"true,false" }}) { updateStructureWatts(); return; }          /* DCR + Non-DCR: both numbers are typed */
 
     /* Shows the CALCULATED number only: as the text "Calculated by the system: N" and as the placeholder of the editable box.
        It never overwrites a number the user typed. */
@@ -647,6 +677,16 @@ function updateStructureWatts() {
         const wattage = parseFloat(selected.options[selected.selectedIndex].dataset.wattage);
         if (Number.isFinite(wattage)) { panelWatts = parseFloat(manualPanels.value) * wattage; }
     }
+    if ({{ is_both|yesno:"true,false" }}) {                                           /* DCR + Non-DCR: the watts of both panels */
+        panelWatts = 0;
+        [["panel_option", "panel_quantity_manual"], ["panel2_option", "panel2_quantity"]].forEach(function (pair) {
+            const sel = document.getElementById(pair[0]), num = document.getElementById(pair[1]);
+            if (sel && num && sel.selectedIndex > 0 && num.value) {
+                const w = parseFloat(sel.options[sel.selectedIndex].dataset.wattage);
+                if (Number.isFinite(w)) { panelWatts += w * parseFloat(num.value); }
+            }
+        });
+    }
     if (auto) { auto.textContent = String(Math.round(panelWatts * 100) / 100); }
 
     const typed = kw ? parseFloat(kw.value) : NaN;
@@ -655,6 +695,10 @@ function updateStructureWatts() {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
+    ["panel_option", "panel2_option", "panel2_quantity", "panel_quantity_manual"].forEach(function (id) {
+        const e = document.getElementById(id);
+        if (e) { e.addEventListener("input", updateStructureWatts); e.addEventListener("change", updateStructureWatts); }
+    });
     const manualPanelsBox = document.getElementById("panel_quantity_manual");
     if (manualPanelsBox) { manualPanelsBox.addEventListener("input", function () { calculatePanelQuantity(); }); }
     toggleOtherInverter();

@@ -233,7 +233,7 @@ def create_quotation(request):
     location = posted["location"]
     phase = posted["phase"]
     system_size_raw = posted["system_size"]
-    panel_dcr_status = posted["panel_type"] if posted["panel_type"] in ("dcr", "non_dcr") else DEFAULT_PANEL_DCR_STATUS
+    panel_dcr_status = posted["panel_type"] if posted["panel_type"] in ("dcr", "non_dcr", "both") else DEFAULT_PANEL_DCR_STATUS
     structure_type = posted["structure"]
     system_type = posted["system_type"]
 
@@ -372,6 +372,15 @@ def _missing_fields(request, quotation):
         return decimal_or_zero(post.get(name)) <= 0
 
     missing = []
+    if clean_text(quotation.panel_dcr_status).lower() == "both":
+        if empty("panel_option"):
+            missing.append("DCR panel")
+        if zero("panel_quantity_manual"):
+            missing.append("Number of DCR panels")
+        if empty("panel2_option"):
+            missing.append("Non-DCR panel")
+        if zero("panel2_quantity"):
+            missing.append("Number of Non-DCR panels")
     for name, label in (("panel_option", "Panel"), ("inverter_kw", "Inverter capacity"), ("inverter_type", "Inverter"), ("dc_cable", "DC cable"), ("ac_wire", "AC wire")):
         if empty(name):
             missing.append(label)
@@ -401,10 +410,14 @@ def quotation_detail(request, quotation_id):
 
     quotation = get_object_or_404(Quotation, id=quotation_id)
 
+    is_both = clean_text(quotation.panel_dcr_status).lower() == "both"
+    # DCR quotation: only DCR panels.  Non-DCR quotation: only non-DCR panels.  Both: the first list is DCR, the second list non-DCR.
     panel_options = PanelOption.objects.filter(
         is_active=True,
-        dcr_status__iexact=clean_text(quotation.panel_dcr_status),
+        dcr_status__iexact=("dcr" if is_both else clean_text(quotation.panel_dcr_status)),
     ).order_by("company", "panel_type", "wattage")
+    panel2_options = (PanelOption.objects.filter(is_active=True, dcr_status__iexact="non_dcr").order_by("company", "panel_type", "wattage")
+                      if is_both else PanelOption.objects.none())
 
     if quotation.solar_package:
         option_rules = list(quotation.solar_package.option_rules.filter(is_active=True).order_by("excel_row"))
@@ -427,7 +440,8 @@ def quotation_detail(request, quotation_id):
         if panel_option_id:
             panel_option = get_object_or_404(PanelOption, id=panel_option_id, is_active=True)
 
-            if normalized_text(panel_option.dcr_status) != normalized_text(quotation.panel_dcr_status):
+            expected_status = "dcr" if is_both else quotation.panel_dcr_status
+            if normalized_text(panel_option.dcr_status) != normalized_text(expected_status):
                 return HttpResponseBadRequest("Invalid panel DCR selection.")
 
             quotation.panel_option = panel_option
@@ -442,6 +456,21 @@ def quotation_detail(request, quotation_id):
             if problem:
                 return HttpResponseBadRequest(problem)
             quotation.panel_quantity_manual = manual_panels
+
+        # ---- "both": the second panel (NON-DCR) and its number ----
+        if is_both:
+            panel2_id = clean_text(request.POST.get("panel2_option"))
+            panel2 = get_object_or_404(PanelOption, id=panel2_id, is_active=True) if panel2_id else None
+            if panel2 is not None and normalized_text(panel2.dcr_status) != normalized_text("non_dcr"):
+                return HttpResponseBadRequest("The second panel must be a Non-DCR panel.")
+            panel2_quantity, problem = parse_manual_panels(request.POST.get("panel2_quantity"))
+            if problem:
+                return HttpResponseBadRequest(problem)
+            quotation.panel2_option = panel2
+            quotation.panel2_quantity = int(panel2_quantity or 0) if panel2 is not None else 0
+        else:
+            quotation.panel2_option = None
+            quotation.panel2_quantity = 0
 
         # ---- inverter ----
         inverter_kw_raw = clean_text(request.POST.get("inverter_kw"))
@@ -554,6 +583,8 @@ def quotation_detail(request, quotation_id):
         {
             "quotation": quotation,
             "panel_options": panel_options,
+            "panel2_options": panel2_options,
+            "is_both": is_both,
             "summary": summary,
             "structure_kind": structure_kind(quotation.structure_type),
             "inverter_products": Product.objects.filter(category="inverter", is_active=True, rate__gt=0).order_by("name"),

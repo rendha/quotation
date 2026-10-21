@@ -36,7 +36,7 @@ ASSETS_URI = ASSETS_DIR.as_uri() + "/"
 # NOTE: one flat amount is what the old generator printed for every quotation; if the amount
 # depends on system size, replace this constant with a lookup inside subsidy_text().
 SUBSIDY_DCR = Decimal("78000")
-SUBSIDY_NOT_APPLICABLE = "Not applicable (Non-DCR)"
+SUBSIDY_NOT_APPLICABLE = "Not Applicable"
 REFUND_NOTE = "(80% of KSEB Reg fee excluding GST is refundable)"   # shown for DCR only
 
 # {fee} is replaced by quotation.kseb_fee.  If your kseb_fee is BEFORE gst, use
@@ -85,6 +85,15 @@ BOLD_FIRST_LABEL_KEYWORDS = ("MOUNTING",)
 # =====================================================================
 def _is_dcr(q):
     return (q.panel_dcr_status or "").strip().lower() == "dcr"
+
+
+def _is_non_dcr(q):
+    return (q.panel_dcr_status or "").strip().lower() == "non_dcr"
+
+
+def _is_both(q):
+    """A quotation with a DCR panel and a non-DCR panel (the second one is q.panel2_option / q.panel2_quantity)."""
+    return (q.panel_dcr_status or "").strip().lower() == "both" and getattr(q, "panel2_option", None) is not None
 
 
 def _items(q):
@@ -176,18 +185,51 @@ def _positive(value):
         return False
 
 
+def _panel_spec(panel, watts=None):
+    w, tech = (watts or L.fmt_num(panel.wattage)), (panel.panel_type or "").strip()
+    if "TOPCON" in tech.upper():
+        return PANEL_SPEC_TOPCON.format(w=w)
+    if "BIFACIAL" in tech.upper():
+        return PANEL_SPEC_BIFACIAL.format(w=w)
+    return PANEL_SPEC_OTHER.format(tech=tech.title(), w=w).strip()
+
+
+def _panel_kind(panel):
+    tech = (panel.panel_type or "").upper()
+    return "TOPCON" if "TOPCON" in tech else "BIFACIAL" if "BIFACIAL" in tech else tech.strip()
+
+
+def _both_watts(q):
+    """610-620 (or just 610 when both panels have the same wattage)."""
+    a, b = sorted([q.panel_option.wattage, q.panel2_option.wattage])
+    return L.fmt_num(a) if a == b else "%s-%s" % (L.fmt_num(a), L.fmt_num(b))
+
+
+def _both_makes(q):
+    names = []
+    for p in (q.panel_option, q.panel2_option):
+        name = (p.company or "").strip()
+        if name and name.upper() not in [n.upper() for n in names]:
+            names.append(name)
+    return "/".join(names)
+
+
 def _row_panel(q, item, row):
     panel = q.panel_option
+    if _is_both(q):                                         # two kinds of panel on one BOQ row
+        # like the sample "both" quotation: one row, the TOTAL number, the wattage as a range and both makes
+        second = q.panel2_option
+        spec = _panel_spec(panel, _both_watts(q))
+        if _panel_kind(panel) != _panel_kind(second):             # different technology: describe both
+            spec = _panel_spec(panel, L.fmt_num(panel.wattage)) + "\n" + _panel_spec(second, L.fmt_num(second.wattage))
+        out = {"spec": spec, "make": _both_makes(q)}
+        total = (q.panel_quantity or 0) + (q.panel2_quantity or 0)
+        if _positive(total):
+            out["qty"] = L.fmt_num(total)
+        return out
     if panel is None:
         return {}
-    w, tech = L.fmt_num(panel.wattage), (panel.panel_type or "").strip()
-    if "TOPCON" in tech.upper():
-        spec = PANEL_SPEC_TOPCON.format(w=w)
-    elif "BIFACIAL" in tech.upper():
-        spec = PANEL_SPEC_BIFACIAL.format(w=w)
-    else:
-        spec = PANEL_SPEC_OTHER.format(tech=tech.title(), w=w).strip()
-    out = {"spec": spec, "make": (panel.company or "").strip()}
+    out = {"spec": _panel_spec(panel), "make": (panel.company or "").strip()}
     if _positive(q.panel_quantity):
         out["qty"] = L.fmt_num(q.panel_quantity)
     return out
@@ -395,17 +437,28 @@ def _price_summary(q):
 
 def _module_text(q):
     panel = q.panel_option
+    if _is_both(q) and panel is not None:
+        # like the sample: "EMMVEE/RENEWSYS TOPCON BIFACIAL (8DCR+5NDCR)"
+        techs = []
+        for p in (panel, q.panel2_option):
+            t = (p.panel_type or "").strip().upper()
+            if t and t not in techs:
+                techs.append(t)
+        text = " ".join(x for x in (_both_makes(q).upper(), "/".join(techs)) if x)
+        return "%s (%sDCR+%sNDCR)" % (text, L.fmt_num(q.panel_quantity or 0), L.fmt_num(q.panel2_quantity or 0))
     if panel is None:
         return "-"
     text = " ".join(x.strip() for x in (panel.company, panel.panel_type) if x and x.strip()).upper()
     tokens = text.split()
-    if not any(t in ("DCR", "NON-DCR", "NONDCR") for t in tokens):
-        text += " DCR" if _is_dcr(q) else " NON-DCR"
+    if not any(t in ("DCR", "NON-DCR", "NONDCR", "NDCR") for t in tokens):
+        text += " DCR" if _is_dcr(q) else " NDCR"
     return text
 
 
 def _system_size_text(q):
     panel = q.panel_option
+    if _is_both(q) and panel is not None and (q.panel_quantity or q.panel2_quantity):
+        return "%sWP*%s NOS" % (_both_watts(q), L.fmt_num((q.panel_quantity or 0) + (q.panel2_quantity or 0)))
     if panel is not None and q.panel_quantity:
         return "%sWP*%s NOS" % (L.fmt_num(panel.wattage), L.fmt_num(q.panel_quantity))
     return "%s kWp" % L.fmt_num(q.system_size)
@@ -430,6 +483,13 @@ def _summary_rows(q):
         {"label": "KSEB Reg. FEE", "value": KSEB_FEE_TEXT.format(fee=L.inr(q.kseb_fee))},
         {"label": "Subsidy", "value": subsidy_text(q)},
     ]
+    if _is_non_dcr(q):                                # Non-DCR: "Price ₹ 3,90,000/-(KSEB INCLUDED)", no KSEB row, Subsidy: Not Applicable
+        rows = [r for r in rows if r["label"] != "KSEB Reg. FEE"]
+        for r in rows:
+            if r["label"] == "Price":
+                r["value"] += "(KSEB INCLUDED)"
+    if _is_both(q):                                   # the sample "both" quotation has no Subsidy row
+        rows = [r for r in rows if r["label"] != "Subsidy"]
     return L.positioned(rows, L.SUMMARY_TOP, L.SUMMARY_PITCH)
 
 
@@ -488,7 +548,7 @@ def generate_quotation_pdf(quotation):
         _part("summary.html", dict(
             base,
             summary_rows=_summary_rows(q),
-            refund_note=REFUND_NOTE if _is_dcr(q) else "",
+            refund_note=REFUND_NOTE if (_is_dcr(q) or _is_both(q)) else "",
             payment_terms=PAYMENT_TERMS,
             payment_note=PAYMENT_NOTE,
             bank_lines=L.positioned(

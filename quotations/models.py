@@ -443,6 +443,7 @@ class Quotation(models.Model):
     DCR_CHOICES = [
         ("dcr", "DCR"),
         ("non_dcr", "Non-DCR"),
+        ("both", "DCR + Non-DCR"),
     ]
 
     phase = models.CharField(
@@ -524,6 +525,19 @@ class Quotation(models.Model):
 
     panel_quantity_manual = models.PositiveIntegerField(
     null=True, blank=True)
+
+    # "Both" quotations: panel_option / panel_quantity_manual are the DCR panel, these are the NON-DCR panel and how many of it.
+    panel2_option = models.ForeignKey(
+        PanelOption,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="quotations_second_panel",
+    )
+
+    panel2_quantity = models.PositiveIntegerField(
+        default=0,
+    )
 
     panel_total_watt = models.DecimalField(
         max_digits=12,

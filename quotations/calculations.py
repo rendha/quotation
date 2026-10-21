@@ -495,7 +495,8 @@ def _compute(quotation):
 
     # ---- 1-4. PANEL: quantity is ALWAYS recalculated (nearest whole number), then total watts and cost ----
     panel = quotation.panel_option
-    auto_panels = calculate_panel_quantity(quotation.system_size, panel.wattage) if panel is not None else ZERO
+    is_both = (getattr(quotation, "panel_dcr_status", "") or "").strip().lower() == "both"        # a DCR panel AND a non-DCR panel
+    auto_panels = calculate_panel_quantity(quotation.system_size, panel.wattage) if (panel is not None and not is_both) else ZERO
     manual_panels = decimal_or_zero(getattr(quotation, "panel_quantity_manual", None))          # None / 0 = calculated by the system
     panel_is_manual = panel is not None and manual_panels >= 1
     panel_quantity = manual_panels.quantize(Decimal("1"), rounding=ROUND_HALF_UP) if panel_is_manual else auto_panels
@@ -511,7 +512,7 @@ def _compute(quotation):
         panel_note = "%s panels x %s W x Rs %s per watt" % (
             plain_number(panel_quantity), plain_number(panel.wattage), plain_number(panel.rate_per_watt))
         requested_watts = decimal_or_zero(quotation.system_size) * Decimal("1000")
-        if panel_is_manual and requested_watts > 0:                                                 # a typo such as 60 instead of 6
+        if panel_is_manual and requested_watts > 0 and not is_both:                                                 # a typo such as 60 instead of 6
             gap = (panel_total_watt - requested_watts) / requested_watts * HUNDRED
             if abs(gap) > MANUAL_PANELS_WARN_PERCENT:
                 warnings.append("The %s panels entered by hand add up to %s W, which is %s%% %s the %s kW system size (the system calculated %s panels). Check the number."
@@ -519,6 +520,26 @@ def _compute(quotation):
                                    "above" if gap > 0 else "below", plain_number(quotation.system_size), plain_number(auto_panels)))
     else:
         warnings.append("No panel is selected, so the panel cost is 0.")
+
+    # ---- "both": the second (NON-DCR) panel is added to the first (DCR) one ----
+    panel2 = getattr(quotation, "panel2_option", None) if is_both else None
+    panel2_quantity = Decimal(int(getattr(quotation, "panel2_quantity", 0) or 0)) if panel2 is not None else ZERO
+    if is_both:
+        if panel2 is not None and panel2_quantity > 0:
+            panel2_watt = Decimal(panel2.wattage) * panel2_quantity
+            panel_total_watt += panel2_watt
+            panel_value += money(panel2_watt * Decimal(panel2.rate_per_watt))
+            panel_note = (panel_note + " + " if panel_note else "") + "%s non-DCR panels x %s W x Rs %s per watt" % (
+                plain_number(panel2_quantity), plain_number(panel2.wattage), plain_number(panel2.rate_per_watt))
+        else:
+            warnings.append("Both DCR and Non-DCR were chosen, but no Non-DCR panel (or its number) is entered, so only the DCR panels are priced.")
+        requested_watts = decimal_or_zero(quotation.system_size) * Decimal("1000")
+        if requested_watts > 0 and panel_total_watt > 0:
+            gap = (panel_total_watt - requested_watts) / requested_watts * HUNDRED
+            if abs(gap) > MANUAL_PANELS_WARN_PERCENT:
+                warnings.append("The DCR and Non-DCR panels together are %s W, which is %s%% %s the %s kW system size. Check the numbers."
+                                % (plain_number(panel_total_watt), plain_number(abs(gap).quantize(Decimal("1"))),
+                                   "above" if gap > 0 else "below", plain_number(quotation.system_size)))
 
     # ---- 5-8. THE USER'S SELECTION: inverter, DC cable, AC wire, earth and the other components --------
     # Each is priced from the rate sheet (Excel products).  The package items on the quotation are never priced.
@@ -684,6 +705,7 @@ def _compute(quotation):
         "counted_items": counted_items, "display_only_items": display_only_items,
         "panel_quantity": panel_quantity, "panel_quantity_auto": auto_panels, "panel_quantity_is_manual": panel_is_manual,
         "panel_total_watt": panel_total_watt, "panel_value": panel_value,
+        "panel2_quantity": panel2_quantity,
         "panel_tax_amount": panel_tax_display,
         "components_total": components_total, "bos_amount": bos_amount, "structure_note": structure_note,
         "structure_watts": structure_watts, "structure_watts_auto": panel_total_watt, "structure_is_manual": structure_is_manual,
@@ -790,6 +812,10 @@ def material_list(quotation):
     if panel is not None and r["panel_quantity"] > 0:
         label = " ".join(x for x in (clean_text(panel.company), clean_text(panel.panel_type), plain_number(panel.wattage) + " W solar panel") if x)
         add(label, panel.company, "Nos", r["panel_quantity"], Decimal(panel.wattage) * Decimal(panel.rate_per_watt))
+    panel2 = getattr(quotation, "panel2_option", None)
+    if panel2 is not None and r["panel2_quantity"] > 0:
+        label2 = " ".join(x for x in (clean_text(panel2.company), clean_text(panel2.panel_type), plain_number(panel2.wattage) + " W solar panel (non-DCR)") if x)
+        add(label2, panel2.company, "Nos", r["panel2_quantity"], Decimal(panel2.wattage) * Decimal(panel2.rate_per_watt))
     for component in r["components"].values():
         if component["quantity"] > 0 and component["name"]:
             add(component["name"], component["make"], component["unit"], component["quantity"], component["rate"])

@@ -182,8 +182,28 @@
             <h2 class="card-title">Solar System</h2>
             <p class="card-subtitle">Select the system requirements.</p>
 
+            <!-- PANEL TYPE -->
+            <div class="section-title" style="margin-top:0">Panel Type</div>
+            <div class="option-group">
+                <div class="option">
+                    <input type="radio" id="panel_dcr" name="panel_type" value="dcr" required
+                           {% if posted.panel_type == "dcr" or not posted.panel_type %}checked{% endif %}>
+                    <label for="panel_dcr">DCR</label>
+                </div>
+                <div class="option">
+                    <input type="radio" id="panel_non_dcr" name="panel_type" value="non_dcr"
+                           {% if posted.panel_type == "non_dcr" %}checked{% endif %}>
+                    <label for="panel_non_dcr">Non-DCR</label>
+                </div>
+                <div class="option">
+                    <input type="radio" id="panel_both" name="panel_type" value="both"
+                           {% if posted.panel_type == "both" %}checked{% endif %}>
+                    <label for="panel_both">Both</label>
+                </div>
+            </div>
+
             <!-- PHASE -->
-            <div class="section-title" style="margin-top:0">Phase</div>
+            <div class="section-title">Phase</div>
             <div class="option-group two">
                 <div class="option">
                     <input type="radio" id="single_phase" name="phase" value="Single Phase" required

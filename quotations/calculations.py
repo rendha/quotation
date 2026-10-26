@@ -431,7 +431,7 @@ def rate_sheet_requirements():
     for key, label, category, prefix, by_phase, quantity in RATE_SHEET_COMPONENTS:
         if not by_phase:
             rows.append({"label": label, "category": category, "product": find_product(category, prefix=prefix)})
-    for token, sizes in (("1PH", (3, 5, 8, 10)), ("3PH", (5, 8, 10))):     # the combinations that are sold: 3, 5, 8 and 10 kW single phase, 5, 8 and 10 kW three phase
+    for token, sizes in (("1PH", (3, 4, 5)), ("3PH", (5, 8, 10))):         # the combinations that are sold: 3, 4 and 5 kW single phase, 5, 8 and 10 kW three phase
         for kw in sizes:
             rows.append({"label": "Inverter %s kW %s" % (kw, token), "category": "inverter",
                          "product": find_product("inverter", capacity=Decimal(kw), contains=(token,))})

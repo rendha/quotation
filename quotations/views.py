@@ -13,6 +13,7 @@ from decimal import Decimal
 
 from django.core import signing
 from django.db import transaction
+from django.db.models import Q
 from django.contrib.auth.decorators import login_not_required
 from django.http import FileResponse, Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -361,6 +362,18 @@ def _quantity_from_post(request, name, current):
     return value if value >= 0 else current
 
 
+INVERTER_SIZES = (3, 4, 5, 8, 10)
+
+
+def allowed_inverter_kws(system_size):
+    """The inverter sizes offered for a plant: its own size and every bigger one (3 -> 3, 4, 5, 8, 10 | 4 -> 4, 5, 8, 10 | 5 -> 5, 8, 10 |
+    8 -> 8, 10), and for 10 kW the 8 kW inverter as well (10 -> 10, 8)."""
+    size = decimal_or_zero(system_size)
+    if size >= 10:
+        return [8, 10]
+    return [s for s in INVERTER_SIZES if s >= size]
+
+
 def _missing_fields(request, quotation):
     """The names of the quotation-page fields that were left empty (or a length of 0).  Name, phone, email and address stay optional, as on the first page."""
     post = request.POST
@@ -576,6 +589,9 @@ def quotation_detail(request, quotation_id):
     summary = quotation.cost_breakdown
 
     is_other_inverter = clean_text(quotation.inverter_type).lower() == "other"
+    allowed_kws = allowed_inverter_kws(quotation.system_size)
+    saved_kw = decimal_or_zero(quotation.inverter_kw)
+    kw_options = sorted(set(allowed_kws) | ({int(saved_kw) if saved_kw == int(saved_kw) else saved_kw} if saved_kw > 0 else set()))
 
     return render(
         request,
@@ -587,7 +603,10 @@ def quotation_detail(request, quotation_id):
             "is_both": is_both,
             "summary": summary,
             "structure_kind": structure_kind(quotation.structure_type),
-            "inverter_products": Product.objects.filter(category="inverter", is_active=True, rate__gt=0).order_by("name"),
+            "inverter_products": Product.objects.filter(category="inverter", is_active=True, rate__gt=0).filter(
+                Q(inverter_capacity__in=allowed_kws) | Q(inverter_capacity__isnull=True) | Q(inverter_capacity__lte=0)
+                | Q(name=clean_text(quotation.inverter_type))).order_by("name"),
+            "inverter_kw_options": kw_options,
             "dc_cable_products": Product.objects.filter(category="dc_cable", is_active=True, rate__gt=0).order_by("name"),
             "ac_wire_products": Product.objects.filter(category="ac_wire", is_active=True, rate__gt=0).order_by("name"),
             "other_inverter_name": quotation.inverter_make if is_other_inverter else "",

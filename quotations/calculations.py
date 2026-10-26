@@ -79,14 +79,15 @@ MANUAL_PANELS_WARN_PERCENT = Decimal("20")
 
 # Predefined BOS (balance of system) amount added ONCE to every quotation's cost.
 # It replaces the individual BOS rows (sockets, glands, clamps ...), which are never added.
-# The amount depends on the plant size (kW) and the phase:  3 kW 10,000 | 4 kW 10,000 | 5 kW 1-phase 12,000 | 5 kW 3-phase 15,000 | 8 kW 15,000.
+# The amount depends on the plant size (kW) and the phase:  3 kW 10,000 | 4 kW 10,000 | 5 kW 1-phase 12,000 | 5 kW 3-phase 15,000 | 8 kW 13,000 | 10 kW 13,000.
 # key = (kW, "1PH" / "3PH" / None);  None = any phase.  A size that is not listed uses BOS_FIXED_AMOUNT.
 BOS_AMOUNTS = {
     (Decimal("3"), None): Decimal("10000"),
     (Decimal("4"), None): Decimal("10000"),          # 4 kW uses the 3 kW BOS amount (change this number to change it)
     (Decimal("5"), "1PH"): Decimal("12000"),
     (Decimal("5"), "3PH"): Decimal("15000"),
-    (Decimal("8"), None): Decimal("15000"),
+    (Decimal("8"), None): Decimal("13000"),
+    (Decimal("10"), None): Decimal("13000"),          # 10 kW uses the same BOS amount as 8 kW
 }
 BOS_FIXED_AMOUNT = Decimal("10000")
 
@@ -430,7 +431,7 @@ def rate_sheet_requirements():
     for key, label, category, prefix, by_phase, quantity in RATE_SHEET_COMPONENTS:
         if not by_phase:
             rows.append({"label": label, "category": category, "product": find_product(category, prefix=prefix)})
-    for token, sizes in (("1PH", (3, 5, 8)), ("3PH", (5, 8))):             # the combinations that are sold: 3, 5 and 8 kW single phase, 5 and 8 kW three phase
+    for token, sizes in (("1PH", (3, 5, 8, 10)), ("3PH", (5, 8, 10))):     # the combinations that are sold: 3, 5, 8 and 10 kW single phase, 5, 8 and 10 kW three phase
         for kw in sizes:
             rows.append({"label": "Inverter %s kW %s" % (kw, token), "category": "inverter",
                          "product": find_product("inverter", capacity=Decimal(kw), contains=(token,))})

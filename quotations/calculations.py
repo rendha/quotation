@@ -388,6 +388,8 @@ def find_product(category, name=None, prefix=None, contains=(), capacity=None):
     from .models import Product                      # imported here so this module can be tested without Django
 
     queryset = Product.objects.filter(category=category, is_active=True)
+    if category == "inverter" and "HYBRID" not in " ".join([clean_text(name), clean_text(prefix)] + [clean_text(c) for c in contains]).upper():
+        queryset = queryset.exclude(name__icontains="HYBRID")      # the hybrid inverters are only found when asked for by name
     if name:
         queryset = queryset.filter(name__iexact=name)
     if prefix:
@@ -397,6 +399,40 @@ def find_product(category, name=None, prefix=None, contains=(), capacity=None):
     if capacity is not None:
         queryset = queryset.filter(inverter_capacity=capacity)
     return queryset.order_by("name").first()
+
+
+def is_hybrid(quotation):
+    """True for a Hybrid quotation (solar + battery + grid): it has a hybrid inverter and a battery."""
+    return "hybrid" in clean_text(getattr(quotation, "system_type", "")).lower()
+
+
+def default_hybrid_inverter(kw, token):
+    """
+    The hybrid inverter for a plant: the one of exactly this kW (any phase: a 3 kW three-phase plant can have the 3 kW single-phase one),
+    else the smallest one that is bigger (4 kW -> 5 kW); a matching phase is preferred.
+    """
+    from .models import Product
+
+    kw = decimal_or_zero(kw)
+    base = Product.objects.filter(category="inverter", is_active=True, name__icontains="HYBRID")
+    for queryset in (base.filter(inverter_capacity=kw, name__icontains=token), base.filter(inverter_capacity=kw),
+                     base.filter(inverter_capacity__gte=kw, name__icontains=token), base.filter(inverter_capacity__gte=kw)):
+        found = queryset.order_by("inverter_capacity", "name").first()
+        if found is not None:
+            return found
+    return base.order_by("-inverter_capacity", "name").first()
+
+
+def default_hybrid_battery(inverter_name):
+    """The battery that goes with a hybrid inverter: Solis -> Enprimo (same warranty), Polycab -> Polycab."""
+    upper = clean_text(inverter_name).upper()
+    brand = "ENPRIMO" if "SOLIS" in upper else "POLYCAB"
+    years = "10 YEARS" if "10 YEARS" in upper else "5 YEARS"
+    for contains in ((years,), ()):
+        found = find_product("battery", prefix=brand, contains=contains)
+        if found is not None:
+            return found
+    return find_product("battery")
 
 
 def inverter_traits(name, capacity=None):
@@ -431,6 +467,11 @@ def rate_sheet_requirements():
     for key, label, category, prefix, by_phase, quantity in RATE_SHEET_COMPONENTS:
         if not by_phase:
             rows.append({"label": label, "category": category, "product": find_product(category, prefix=prefix)})
+    rows.append({"label": "Hybrid battery", "category": "battery", "product": find_product("battery")})
+    rows.append({"label": "Hybrid battery MCCB box", "category": "battery_box", "product": find_product("battery_box")})
+    for kw in ("3", "3.6", "5", "6", "8", "10"):
+        rows.append({"label": "Hybrid inverter %s kW" % kw, "category": "inverter",
+                     "product": find_product("inverter", capacity=Decimal(kw), contains=("HYBRID",))})
     for token, sizes in (("1PH", (3, 4, 5)), ("3PH", (5, 8, 10))):         # the combinations that are sold: 3, 4 and 5 kW single phase, 5, 8 and 10 kW three phase
         for kw in sizes:
             rows.append({"label": "Inverter %s kW %s" % (kw, token), "category": "inverter",
@@ -573,8 +614,11 @@ def _compute(quotation):
         if rate <= 0:
             warnings.append("'Other' inverter selected but no rate was entered.")
     else:
+        hybrid = is_hybrid(quotation)
         inverter = find_product("inverter", name=selected["inverter_type"]) if selected["inverter_type"] else None
-        if inverter is None:
+        if inverter is None and hybrid:
+            inverter = default_hybrid_inverter(inverter_kw, token)
+        elif inverter is None:
             inverter = find_product("inverter", capacity=inverter_kw, contains=(token,))
             if inverter is None:                                                     # e.g. an inverter whose name does not say the phase
                 inverter = find_product("inverter", capacity=inverter_kw)
@@ -629,6 +673,21 @@ def _compute(quotation):
         price(key, label, product, quantity,
               "No %s rate found%s. Add it in Admin > Products (category %s, name starting %s)." %
               (label.lower(), " for %s" % token if by_phase else "", category, prefix), unit)
+
+    # ---- HYBRID: the battery (as many as chosen) and its MCCB box are added to the cost ----
+    if is_hybrid(quotation):
+        battery_name = clean_text(getattr(quotation, "battery_type", ""))
+        battery = find_product("battery", name=battery_name) if battery_name else None
+        if battery is None:
+            battery = default_hybrid_battery(components.get("inverter", {}).get("name", ""))
+        battery_quantity = max(int(getattr(quotation, "battery_quantity", 1) or 1), 1)
+        price("battery", "Battery", battery, battery_quantity,
+              "No battery rate found. Add it in Admin > Products (category Battery (hybrid)).")
+        if battery is not None:
+            selected["battery_type"] = battery.name
+        battery_box = find_product("battery_box")
+        if battery_box is not None:                       # optional: no active box product = no box in the price
+            price("battery_box", "Battery MCCB box", battery_box, 1, "")
 
     components_total = money(sum((c["amount"] for c in components.values()), ZERO))
     bos_amount = money(bos_amount_for(quotation.system_size, token))
@@ -787,6 +846,8 @@ def calculate_quotation(quotation):
     quotation.dc_cable = r["selected"]["dc_cable"]
     quotation.ac_wire = r["selected"]["ac_wire"]
     quotation.inverter_kw = r["inverter_kw"]
+    if "battery_type" in r["selected"]:
+        quotation.battery_type = r["selected"]["battery_type"]
     quotation.kseb_fee = r["kseb_fee"]                          # always inverter kW x 1000
     inverter = r["components"]["inverter"]
     quotation.inverter_make = inverter["make"]

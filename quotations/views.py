@@ -32,6 +32,7 @@ from .calculations import (
     clean_text,
     decimal_or_zero,
     find_quotation_item,
+    is_hybrid,
     normalized_text,
     plain_number,
     structure_kind,
@@ -374,6 +375,14 @@ def allowed_inverter_kws(system_size):
     return [s for s in INVERTER_SIZES if s >= size]
 
 
+def hybrid_inverter_kws(system_size):
+    """The hybrid inverter sizes offered for a plant: its own size and the bigger ones up to twice the plant (at least 10 kW), and the 8 kW one for a 10 kW plant."""
+    size = decimal_or_zero(system_size)
+    capacities = sorted({p.inverter_capacity for p in Product.objects.filter(
+        category="inverter", is_active=True, name__icontains="HYBRID", inverter_capacity__isnull=False)})
+    return [c for c in capacities if (c >= size and c <= max(size * 2, 10)) or (size >= 10 and c == 8)]
+
+
 def _missing_fields(request, quotation):
     """The names of the quotation-page fields that were left empty (or a length of 0).  Name, phone, email and address stay optional, as on the first page."""
     post = request.POST
@@ -430,7 +439,7 @@ def quotation_detail(request, quotation_id):
         dcr_status__iexact=("dcr" if is_both else clean_text(quotation.panel_dcr_status)),
     ).order_by("company", "panel_type", "wattage")
     panel2_options = (PanelOption.objects.filter(is_active=True, dcr_status__iexact="non_dcr").order_by("company", "panel_type", "wattage")
-                      if is_both else PanelOption.objects.none())
+                      if is_both else panel_options)             # a DCR / Non-DCR quotation: the second panel offered is of the same kind
 
     if quotation.solar_package:
         option_rules = list(quotation.solar_package.option_rules.filter(is_active=True).order_by("excel_row"))
@@ -482,7 +491,11 @@ def quotation_detail(request, quotation_id):
             quotation.panel2_option = panel2
             quotation.panel2_quantity = int(panel2_quantity or 0) if panel2 is not None else 0
         else:
-            quotation.panel2_option = None
+            # DCR / Non-DCR: an optional SECOND panel (same kind) offered to the customer.  The price uses the first panel only
+            # (quantity 0 = not priced); the PDF prints both makes.
+            alt_id = clean_text(request.POST.get("panel2_option"))
+            quotation.panel2_option = PanelOption.objects.filter(
+                id=alt_id, is_active=True, dcr_status__iexact=clean_text(quotation.panel_dcr_status)).first() if alt_id.isdigit() else None
             quotation.panel2_quantity = 0
 
         # ---- inverter ----
@@ -511,6 +524,17 @@ def quotation_detail(request, quotation_id):
                 inverter_item.save()
                 quotation.inverter_make = other_inverter_name
                 quotation.inverter_rate = other_inverter_rate
+
+        # ---- hybrid: the battery and how many ----
+        if is_hybrid(quotation):
+            quotation.battery_type = clean_text(request.POST.get("battery_type"))
+            try:
+                battery_quantity = int(clean_text(request.POST.get("battery_quantity")) or 1)
+            except ValueError:
+                return HttpResponseBadRequest("The number of batteries must be a whole number.")
+            if battery_quantity < 1 or battery_quantity > 50:
+                return HttpResponseBadRequest("The number of batteries must be between 1 and 50.")
+            quotation.battery_quantity = battery_quantity
 
         # ---- DC cable / AC wire: product + editable quantity ----
         dc_cable = clean_text(request.POST.get("dc_cable"))
@@ -589,7 +613,15 @@ def quotation_detail(request, quotation_id):
     summary = quotation.cost_breakdown
 
     is_other_inverter = clean_text(quotation.inverter_type).lower() == "other"
-    allowed_kws = allowed_inverter_kws(quotation.system_size)
+    hybrid = is_hybrid(quotation)
+    allowed_kws = hybrid_inverter_kws(quotation.system_size) if hybrid else allowed_inverter_kws(quotation.system_size)
+    if hybrid:
+        inverter_products = Product.objects.filter(category="inverter", is_active=True, rate__gt=0, name__icontains="HYBRID").filter(
+            Q(inverter_capacity__in=allowed_kws) | Q(name=clean_text(quotation.inverter_type))).order_by("inverter_capacity", "name")
+    else:
+        inverter_products = Product.objects.filter(category="inverter", is_active=True, rate__gt=0).exclude(name__icontains="HYBRID").filter(
+            Q(inverter_capacity__in=allowed_kws) | Q(inverter_capacity__isnull=True) | Q(inverter_capacity__lte=0)
+            | Q(name=clean_text(quotation.inverter_type))).order_by("name")
     saved_kw = decimal_or_zero(quotation.inverter_kw)
     kw_options = sorted(set(allowed_kws) | ({int(saved_kw) if saved_kw == int(saved_kw) else saved_kw} if saved_kw > 0 else set()))
 
@@ -603,9 +635,10 @@ def quotation_detail(request, quotation_id):
             "is_both": is_both,
             "summary": summary,
             "structure_kind": structure_kind(quotation.structure_type),
-            "inverter_products": Product.objects.filter(category="inverter", is_active=True, rate__gt=0).filter(
-                Q(inverter_capacity__in=allowed_kws) | Q(inverter_capacity__isnull=True) | Q(inverter_capacity__lte=0)
-                | Q(name=clean_text(quotation.inverter_type))).order_by("name"),
+            "inverter_products": inverter_products,
+            "is_hybrid": hybrid,
+            "battery_quantity_options": sorted(set(range(1, 11)) | {int(quotation.battery_quantity or 1)}),
+            "battery_products": Product.objects.filter(category="battery", is_active=True, rate__gt=0).order_by("name"),
             "inverter_kw_options": kw_options,
             "dc_cable_products": Product.objects.filter(category="dc_cable", is_active=True, rate__gt=0).order_by("name"),
             "ac_wire_products": Product.objects.filter(category="ac_wire", is_active=True, rate__gt=0).order_by("name"),

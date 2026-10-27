@@ -12,6 +12,8 @@ class Product(models.Model):
     CATEGORY_CHOICES = [
         ("module", "PV Module"),
         ("inverter", "Inverter"),
+        ("battery", "Battery (hybrid)"),
+        ("battery_box", "Battery MCCB box (hybrid)"),
         ("structure", "Mounting Structure"),
         ("acdb", "ACDB"),
         ("dcdb", "DCDB"),
@@ -607,6 +609,16 @@ class Quotation(models.Model):
         max_digits=14,
         decimal_places=2,
         default=Decimal("0"),
+    )
+
+    # Hybrid quotations only: the battery product and how many of it.
+    battery_type = models.CharField(
+        max_length=100,
+        blank=True,
+    )
+
+    battery_quantity = models.PositiveIntegerField(
+        default=1,
     )
 
     inverter_tax_percent = models.DecimalField(

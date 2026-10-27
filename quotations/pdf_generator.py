@@ -20,7 +20,7 @@ from pathlib import Path
 from pypdf import PdfReader, PdfWriter
 
 from . import pdf_layout as L
-from .calculations import GST_RATE, find_quotation_item, is_tata, structure_kind
+from .calculations import GST_RATE, find_quotation_item, is_hybrid, is_tata, structure_kind
 from .pdf_boq_sample import SAMPLE_BOQ
 
 DESIGN_DIR = Path(__file__).resolve().parent / "pdf_design"
@@ -98,6 +98,12 @@ def _is_both(q):
 
 def _items(q):
     return sorted(q.items.all(), key=lambda i: i.id)
+
+
+def _is_alt(q):
+    """A DCR / Non-DCR quotation that offers a SECOND panel (q.panel2_option, quantity 0): priced with the first panel, printed with both makes."""
+    return ((q.panel_dcr_status or "").strip().lower() in ("dcr", "non_dcr") and getattr(q, "panel2_option", None) is not None
+            and q.panel_option is not None)
 
 
 def _find_item(q, keyword):
@@ -216,14 +222,14 @@ def _both_makes(q):
 
 def _row_panel(q, item, row):
     panel = q.panel_option
-    if _is_both(q):                                         # two kinds of panel on one BOQ row
+    if _is_both(q) or _is_alt(q):                           # two kinds of panel on one BOQ row
         # like the sample "both" quotation: one row, the TOTAL number, the wattage as a range and both makes
         second = q.panel2_option
         spec = _panel_spec(panel, _both_watts(q))
         if _panel_kind(panel) != _panel_kind(second):             # different technology: describe both
             spec = _panel_spec(panel, L.fmt_num(panel.wattage)) + "\n" + _panel_spec(second, L.fmt_num(second.wattage))
         out = {"spec": spec, "make": _both_makes(q)}
-        total = (q.panel_quantity or 0) + (q.panel2_quantity or 0)
+        total = (q.panel_quantity or 0) + ((q.panel2_quantity or 0) if _is_both(q) else 0)      # an offered second panel is not added to the number
         if _positive(total):
             out["qty"] = L.fmt_num(total)
         return out
@@ -253,11 +259,22 @@ def _row_inverter(q, item, row):
     spec = row["spec"].replace("{kw}", L.fmt_num(kw)) \
                       .replace("{phase}", phase) \
                       .replace("1 MPPT trackers", "%s MPPT trackers" % mppt)
+    if is_hybrid(q):
+        spec = spec.replace("on grid inverter", "Hybrid inverter")
+        years = _warranty_years(comp.get("name") or q.inverter_type)
+        if years:
+            spec = re.sub(r"Warranty: \d+ Years", "Warranty: %s Years" % years, spec)
     out = {"spec": spec, "qty": "1"}
     make = _inverter_make(q)
     if make:
         out["make"] = make
     return out
+
+
+def _warranty_years(name):
+    """'SOLIS HYBRID 5KW 1PH - 10 YEARS WARRANTY' -> '10' (empty when the name has no warranty)."""
+    found = re.search(r"(\d+)\s*YEARS", (name or "").upper())
+    return found.group(1) if found else ""
 
 
 def _row_structure(q, item, row):
@@ -395,7 +412,33 @@ def _boq_rows(q):
             "qty": values["qty"],
             "make": values["make"],
         })
+    if is_hybrid(q):
+        battery = _battery_row(q)
+        if battery is not None:
+            rows[1]["rowspan"] = 2                                    # the sample: the battery is a second line of the inverter's number
+            rows.insert(2, battery)
     return rows
+
+
+def _battery_row(q):
+    """The BOQ row of a hybrid quotation's battery (None when no battery was priced)."""
+    comp = _comp(q, "battery")
+    name = (comp.get("name") or "").strip()
+    if not name:
+        return None
+    upper = name.upper()
+    spec = "Li-Ion battery"
+    kwh = re.search(r"(\d+(?:\.\d+)?)\s*KWH", upper)
+    cycles = re.search(r"(\d+)\s*CYCLE", upper)
+    if kwh:
+        spec += " %s kWh" % kwh.group(1)
+    if cycles:
+        spec += ", %s cycles" % cycles.group(1)
+    years = _warranty_years(name)
+    if years:
+        spec += "\nWarranty: %s Years" % years
+    return {"sr": "", "skip_sr": True, "particular": L.text_html("Battery"), "spec": L.spec_html(spec, blue_labels=True, bold_first_label=False),
+            "qty": L.fmt_num(comp.get("quantity") or 1), "make": (comp.get("make") or "").strip() or "POLYCAB"}
 
 
 def _customer_lines(q):
@@ -437,6 +480,13 @@ def _price_summary(q):
 
 def _module_text(q):
     panel = q.panel_option
+    if _is_alt(q):                                    # two makes offered: "ADANI/RENEWSYS TOPCON DCR"
+        techs = []
+        for p in (panel, q.panel2_option):
+            t = (p.panel_type or "").strip().upper()
+            if t and t not in techs:
+                techs.append(t)
+        return " ".join(x for x in (_both_makes(q).upper(), "/".join(techs), "DCR" if _is_dcr(q) else "NDCR") if x)
     if _is_both(q) and panel is not None:
         # like the sample: "EMMVEE/RENEWSYS TOPCON BIFACIAL (8DCR+5NDCR)"
         techs = []
@@ -459,6 +509,8 @@ def _system_size_text(q):
     panel = q.panel_option
     if _is_both(q) and panel is not None and (q.panel_quantity or q.panel2_quantity):
         return "%sWP*%s NOS" % (_both_watts(q), L.fmt_num((q.panel_quantity or 0) + (q.panel2_quantity or 0)))
+    if _is_alt(q) and q.panel_quantity:
+        return "%sWP*%s NOS" % (_both_watts(q), L.fmt_num(q.panel_quantity))
     if panel is not None and q.panel_quantity:
         return "%sWP*%s NOS" % (L.fmt_num(panel.wattage), L.fmt_num(q.panel_quantity))
     return "%s kWp" % L.fmt_num(q.system_size)
@@ -466,6 +518,8 @@ def _system_size_text(q):
 
 def _inverter_text(q):
     kw = _comp(q, "inverter").get("capacity") or q.inverter_kw or q.system_size       # the inverter's own kW
+    if is_hybrid(q):
+        return ("%s Hybrid %skW" % (_inverter_make(q), L.fmt_num(kw))).strip()          # the sample: "SOLAIRE Hybrid 5kW"
     return ("%s %s KW" % (_inverter_make(q), L.fmt_num(kw))).strip()
 
 
@@ -488,7 +542,7 @@ def _summary_rows(q):
         for r in rows:
             if r["label"] == "Price":
                 r["value"] += "(KSEB INCLUDED)"
-    if _is_both(q):                                   # the sample "both" quotation has no Subsidy row
+    if _is_both(q) or is_hybrid(q):                   # the sample "both" and hybrid quotations have no Subsidy row
         rows = [r for r in rows if r["label"] != "Subsidy"]
     return L.positioned(rows, L.SUMMARY_TOP, L.SUMMARY_PITCH)
 

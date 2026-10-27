@@ -256,6 +256,27 @@
             </div>
             {% else %}
             <div class="field">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                    <input type="checkbox" id="offer_second_panel" style="width:auto" {% if quotation.panel2_option_id %}checked{% endif %}>
+                    <span>Offer one more panel <span class="hint">(the price uses the panel above, the PDF shows both makes)</span></span>
+                </label>
+            </div>
+
+            <div class="field" id="second-panel-box" style="{% if not quotation.panel2_option_id %}display:none{% endif %}">
+                <label for="panel2_option">One more panel</label>
+                <select name="panel2_option" id="panel2_option">
+                    <option value="">None</option>
+                    {% for panel in panel2_options %}
+                        {% if panel.id != quotation.panel_option_id %}
+                        <option value="{{ panel.id }}" {% if quotation.panel2_option_id == panel.id %}selected{% endif %}>
+                            {{ panel.company }} - {{ panel.panel_type }} - {{ panel.wattage|floatformat:"-2" }}W - {{ panel.get_dcr_status_display }}
+                        </option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field">
                 <label for="panel_quantity_manual">Number of Panels <span class="hint">(the system calculates it{% if panel_shortfall_percent < 100 %}, never more than {{ panel_shortfall_percent|floatformat:"-2" }}% under the system size{% endif %}; type a number here only to change it)</span></label>
                 {% if can_edit_panels %}
                 <input type="number" min="1" max="500" step="1" id="panel_quantity_manual" name="panel_quantity_manual"
@@ -286,7 +307,7 @@
          INVERTER
     ================================================= -->
     <div class="card">
-        <h2 class="card-title">Inverter</h2>
+        <h2 class="card-title">Inverter{% if is_hybrid %} (Hybrid){% endif %}</h2>
 
         <div class="form-grid">
             <div class="field">
@@ -327,6 +348,57 @@
             </div>
         </div>
     </div>
+
+
+    {% if is_hybrid %}
+    <!-- =================================================
+         BATTERY  (hybrid only)
+    ================================================= -->
+    <div class="card">
+        <h2 class="card-title">Battery</h2>
+
+        <div class="form-grid">
+            <div class="field">
+                <label for="battery_type">Battery</label>
+                <select name="battery_type" id="battery_type">
+                    {% for product in battery_products %}
+                        <option value="{{ product.name }}" {% if quotation.battery_type == product.name %}selected{% endif %}>
+                            {{ product.name }}{% if show_rates %} (&#8377;{{ product.rate|floatformat:2 }}){% endif %}
+                        </option>
+                    {% empty %}
+                        <option value="">No battery in the product list</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="battery_quantity">Number of batteries</label>
+                <select name="battery_quantity" id="battery_quantity">
+                    {% for n in battery_quantity_options %}
+                        <option value="{{ n }}" {% if quotation.battery_quantity == n %}selected{% endif %}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+    <script>
+    // hybrid: choosing a Solis inverter picks the Enprimo battery (and Polycab -> Polycab), with the same warranty
+    (function () {
+        const inverter = document.getElementById("inverter_type"), battery = document.getElementById("battery_type");
+        if (!inverter || !battery) return;
+        inverter.addEventListener("change", function () {
+            const name = inverter.value.toUpperCase(), brand = name.indexOf("SOLIS") >= 0 ? "ENPRIMO" : "POLYCAB";
+            const years = name.indexOf("10 YEARS") >= 0 ? "10 YEARS" : "5 YEARS";
+            let pick = null;
+            Array.from(battery.options).forEach(function (o) {
+                const t = o.value.toUpperCase();
+                if (t.indexOf(brand) === 0 && (pick === null || t.indexOf(years) >= 0)) pick = o;
+            });
+            if (pick) battery.value = pick.value;
+        });
+    }());
+    </script>
+    {% endif %}
 
 
     <!-- =================================================
@@ -691,6 +763,13 @@ function updateStructureWatts() {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
+    const offer = document.getElementById("offer_second_panel"), secondBox = document.getElementById("second-panel-box");
+    if (offer && secondBox) {                       /* DCR / Non-DCR: the second panel box is shown only after the tick; unticking clears it */
+        offer.addEventListener("change", function () {
+            secondBox.style.display = offer.checked ? "" : "none";
+            if (!offer.checked) { document.getElementById("panel2_option").value = ""; }
+        });
+    }
     ["panel_option", "panel2_option", "panel2_quantity", "panel_quantity_manual"].forEach(function (id) {
         const e = document.getElementById(id);
         if (e) { e.addEventListener("input", updateStructureWatts); e.addEventListener("change", updateStructureWatts); }

@@ -139,9 +139,9 @@
                 </div>
 
                 <div class="field">
-                    <label for="customer_name">Quotation For (person)</label>
+                    <label for="customer_name">Quotation For (person) <span class="required">*</span></label>
                     <input type="text" id="customer_name" name="customer_name" value="{{ posted.customer_name }}"
-                           placeholder="e.g. Imran" list="people-names" autocomplete="off">
+                           placeholder="e.g. Imran" list="people-names" autocomplete="off" required>
                     <datalist id="people-names">
                         {% for name in people_names %}<option value="{{ name }}">{% endfor %}
                     </datalist>

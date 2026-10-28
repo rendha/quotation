@@ -182,9 +182,9 @@
 
         <div class="form-grid" style="margin-top:20px">
             <div class="field">
-                <label for="customer_name">Quotation For (person)</label>
+                <label for="customer_name">Quotation For (person) <span style="color:#c0392b">*</span></label>
                 <input type="text" id="customer_name" name="customer_name" value="{{ quotation.customer_name }}"
-                       placeholder="e.g. Imran" list="people-names" autocomplete="off">
+                       placeholder="e.g. Imran" list="people-names" autocomplete="off" required>
                 <datalist id="people-names">
                     {% for name in people_names %}<option value="{{ name }}">{% endfor %}
                 </datalist>

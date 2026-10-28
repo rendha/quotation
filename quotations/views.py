@@ -242,6 +242,8 @@ def create_quotation(request):
     # ---- validation ----
     if not business_name:
         return _create_error(request, "Please enter customer name.", posted)
+    if not posted["customer_name"]:
+        return _create_error(request, "Please enter who the quotation is for (Quotation For).", posted)
     if not location:
         return _create_error(request, "Please enter project location.", posted)
     if not phase:
@@ -384,7 +386,7 @@ def hybrid_inverter_kws(system_size):
 
 
 def _missing_fields(request, quotation):
-    """The names of the quotation-page fields that were left empty (or a length of 0).  Name, phone, email and address stay optional, as on the first page."""
+    """The names of the quotation-page fields that were left empty (or a length of 0).  Quotation For is required; phone, email and address stay optional, as on the first page."""
     post = request.POST
 
     def empty(name):
@@ -394,6 +396,8 @@ def _missing_fields(request, quotation):
         return decimal_or_zero(post.get(name)) <= 0
 
     missing = []
+    if "customer_name" in post and empty("customer_name"):
+        missing.append("Quotation For")
     if clean_text(quotation.panel_dcr_status).lower() == "both":
         if empty("panel_option"):
             missing.append("DCR panel")

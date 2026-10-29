@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dehlsen Energy - Hybrid calculator</title>
+{% include "quotations/_pwa_head.html" %}
+<style>
+:root{--radius:10px;--surface-1:#eef2f7;--surface-2:#fff;--border:#e2e8f0;--border-strong:#cbd5e1;--border-stronger:#3B73B9;--border-danger:#dc2626;
+--text-secondary:#475569;--text-muted:#94a3b8;--text-danger:#b91c1c;--text-warning:#b45309;--text-success:#15803d;
+--bg-warning:#fef3c7;--bg-danger:#fee2e2;--bg-success:#dcfce7;--fill-accent:#3B73B9}
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f7fb;color:#1f2937}
+.header{background:#3B73B9;color:#fff;padding:20px}
+.header h1{margin:0;font-size:22px}.header p{margin:4px 0 0;font-size:13px;opacity:.9}
+.wrap{max-width:1000px;margin:auto;padding:16px}
+.back{display:inline-block;margin-bottom:12px;color:#3B73B9;text-decoration:none;font-size:14px}
+input{border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#1f2937;font-family:inherit}
+button{border:1px solid var(--border-strong);background:transparent;color:#1f2937;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit}
+.ti::before{display:inline-block;margin-right:2px}
+.ti-refresh::before{content:"\21BB"}.ti-plus::before{content:"+"}
+.ti-player-pause::before{content:"\275A\275A";font-size:9px}.ti-player-play::before{content:"\25B6";font-size:10px}
+.ti-circle-check::before{content:"\2714"}.ti-circle-x::before{content:"\2716"}.ti-alert-triangle::before{content:"\26A0"}
+.ti-clock::before{content:"\23F1"}.ti-info-circle::before{content:"\2139"}.ti-x::before,.ti-trash::before{content:"\00D7"}
+.note-box{font-size:12px;color:#64748b;margin:16px 0 0}
+</style>
+</head>
+<body>
+<header class="header"><h1>Hybrid calculator</h1><p>Check a battery, inverter and load set-up. Nothing here is saved.</p></header>
+<main class="wrap">
+<a href="{% url 'quotation_dashboard' %}" class="back">&larr; Back to Quotations</a>
+{% verbatim %}
+<div id="vis-container"><h2 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;">Editable simulator with single-phase or three-phase inverter option, switch-on mode, and battery and inverter limit checks.</h2>
+<style>
+.pn{background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:12px 14px}
+.pn h3{font-size:14px;font-weight:500;margin:0 0 8px}
+.fr{display:grid;grid-template-columns:minmax(0,1fr) 78px 52px;align-items:center;gap:6px;margin:0 0 5px}
+.fr span{font-size:13px;color:var(--text-secondary)}
+.fr i{font-style:normal;font-size:12px;color:var(--text-muted)}
+.fr input,.lr input{height:30px;padding:0 8px;font-size:13px;width:100%;box-sizing:border-box}
+.lr{display:grid;grid-template-columns:minmax(0,1fr) 62px 58px 58px 58px 30px;gap:6px;align-items:center;margin:0 0 5px}
+</style>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;margin:0 0 12px;">
+  <div class="pn"><h3>Battery</h3><div id="bat"></div><div id="pack" style="font-size:12px;color:var(--text-secondary);margin-top:6px;"></div></div>
+  <div class="pn"><h3>Inverter</h3>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 4px;">
+      <span style="font-size:13px;color:var(--text-secondary);">Phases</span>
+      <button id="p1">Single-phase</button>
+      <button id="p3">Three-phase</button>
+    </div>
+    <div id="phNote" style="font-size:12px;color:var(--text-muted);margin:0 0 8px;min-height:0;"></div>
+    <div id="inv"></div><h3 style="margin-top:10px;">Animation</h3><div id="sim"></div>
+    <div style="display:flex;gap:8px;margin-top:8px;"><button id="reset"><i class="ti ti-refresh" aria-hidden="true"></i> Reset defaults</button></div></div>
+</div>
+
+<div class="pn" style="margin:0 0 12px;">
+  <h3>Loads</h3>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;">
+    <span style="font-size:13px;color:var(--text-secondary);">Switch-on mode</span>
+    <button id="mSeq">One by one</button>
+    <button id="mAll">All together</button>
+    <span id="modeNote" style="font-size:12px;color:var(--text-muted);"></span>
+  </div>
+  <div id="loads"></div>
+  <button id="add" style="margin-top:4px;"><i class="ti ti-plus" aria-hidden="true"></i> Add load</button>
+</div>
+
+<div id="err" style="font-size:13px;color:var(--text-danger);margin:0 0 8px;"></div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin:0 0 12px;">
+  <div style="background:var(--surface-1);border-radius:var(--radius);padding:1rem;"><div style="font-size:13px;color:var(--text-secondary);">Load now</div><div style="font-size:24px;font-weight:500;"><span id="mTotal">0</span> kW</div></div>
+  <div id="cardPh" style="background:var(--surface-1);border-radius:var(--radius);padding:1rem;display:none;"><div style="font-size:13px;color:var(--text-secondary);">Load per phase</div><div style="font-size:24px;font-weight:500;"><span id="mPh">0</span> kW</div></div>
+  <div style="background:var(--surface-1);border-radius:var(--radius);padding:1rem;"><div style="font-size:13px;color:var(--text-secondary);">Battery current</div><div style="font-size:24px;font-weight:500;"><span id="mAmp">0</span> A</div></div>
+  <div style="background:var(--surface-1);border-radius:var(--radius);padding:1rem;"><div style="font-size:13px;color:var(--text-secondary);">Battery C-rate</div><div style="font-size:24px;font-weight:500;"><span id="mC">0</span>C</div></div>
+  <div style="background:var(--surface-1);border-radius:var(--radius);padding:1rem;"><div style="font-size:13px;color:var(--text-secondary);">Inverter loading</div><div style="font-size:24px;font-weight:500;"><span id="mPct">0</span>%</div></div>
+  <div style="background:var(--surface-1);border-radius:var(--radius);padding:1rem;"><div style="font-size:13px;color:var(--text-secondary);">Peak so far</div><div style="font-size:24px;font-weight:500;"><span id="mPeak">0</span> kW</div></div>
+</div>
+
+<div style="display:flex;align-items:center;gap:12px;margin:0 0 8px;">
+  <button id="play" aria-label="Play or replay"><i class="ti ti-player-pause" id="playIcon" aria-hidden="true"></i> <span id="playTxt">Pause</span></button>
+  <input type="range" id="scrub" min="0" max="20" step="0.05" value="0" style="flex:1;" aria-label="Time scrubber">
+  <span style="font-size:14px;font-weight:500;min-width:72px;text-align:right;">t = <span id="tOut">0.0</span> s</span>
+</div>
+
+<svg id="g" viewBox="0 0 680 256" width="100%" role="img" aria-label="Total AC power in kW against time, with per-phase load for three-phase mode and battery and inverter limit lines"></svg>
+
+<div id="checks" style="margin-top:12px;"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const DT=0.05;
+const defs={
+B:[['V','Nominal voltage','V',1,1000],['Ah','Capacity per unit','Ah',1,5000],['qty','Units in parallel','',1,32],['cont','Continuous discharge','A / unit',1,2000],['peak','Peak discharge','A / unit',1,3000],['peakT','Peak duration','s',1,600],['chg','Continuous charge','A / unit',1,2000],['dod','Depth of discharge','%',1,100]],
+I:[['rated','Rated output (total)','kW',0.1,500],['surge','Surge output (total)','kW',0.1,1000],['eff','Efficiency','%',50,100],['maxdc','Max DC current','A',1,3000]],
+S:[['T','Animation length','s',5,60],['allOn','All-together switch-on','s',0,60]]};
+const grp={B:'bat',I:'inv',S:'sim'};
+const mkDef=()=>({mode:'seq',ph:1,B:{V:51.2,Ah:314,qty:1,cont:230,peak:280,peakT:10,chg:160,dod:90},I:{rated:8,surge:16,eff:92,maxdc:190},S:{T:20,allOn:2},loads:[
+{n:'Lights',p:1,m:1,d:0,on:0},
+{n:'Induction cooker',p:2,m:1,d:0,on:2},
+{n:'AC 1 (1.5 ton)',p:1.4,m:1.6,d:3,on:5},
+{n:'AC 2 (1.5 ton)',p:1.4,m:1.6,d:3,on:9},
+{n:'AC 3 (1.5 ton)',p:1.4,m:1.6,d:3,on:13}]});
+let st=mkDef(),P=[],An={},chk=[],YM=10,t=0,playing=true,last=null;
+const onT=l=>st.mode==='all'?st.S.allOn:l.on;
+
+Object.keys(defs).forEach(g=>defs[g].forEach(f=>{const r=document.createElement('div');r.className='fr';
+r.innerHTML='<span>'+f[1]+'</span><input type="number" step="any" data-g="'+g+'" data-o="'+f[0]+'" aria-label="'+f[1]+'"><i>'+f[2]+'</i>';$(grp[g]).appendChild(r);}));
+
+function fill(){document.querySelectorAll('input[data-g]').forEach(x=>{x.value=st[x.dataset.g][x.dataset.o];x.style.borderColor='';});}
+function applyPhase(){const a=st.ph===3;
+$('p1').style.background=a?'transparent':'var(--surface-1)';$('p1').style.borderColor=a?'':'var(--border-stronger)';
+$('p3').style.background=a?'var(--surface-1)':'transparent';$('p3').style.borderColor=a?'var(--border-stronger)':'';
+$('cardPh').style.display=a?'':'none';
+$('phNote').textContent=a?'Balanced: total load ÷ 3 on each of L1, L2 and L3. Rated and surge output are totals.':'';}
+function applyMode(){const a=st.mode==='all';
+$('mSeq').style.background=a?'transparent':'var(--surface-1)';$('mSeq').style.borderColor=a?'':'var(--border-stronger)';
+$('mAll').style.background=a?'var(--surface-1)':'transparent';$('mAll').style.borderColor=a?'var(--border-stronger)':'';
+$('modeNote').textContent=a?'All loads switch on at '+st.S.allOn+' s. Individual on-times are ignored.':'Each load switches on at its own time.';
+document.querySelectorAll('input[data-k="on"]').forEach(x=>{x.disabled=a;x.style.opacity=a?'0.5':'';});}
+function buildLoads(){const el=$('loads');
+el.innerHTML='<div class="lr" style="font-size:12px;color:var(--text-muted)"><span>Load</span><span>Run kW</span><span>Surge ×</span><span>Surge s</span><span>On at s</span><span></span></div>';
+st.loads.forEach((l,i)=>{const r=document.createElement('div');r.className='lr';
+r.innerHTML='<input type="text" data-i="'+i+'" data-k="n" aria-label="Load name"><input type="number" step="any" data-i="'+i+'" data-k="p" aria-label="Running power in kW"><input type="number" step="any" data-i="'+i+'" data-k="m" aria-label="Surge multiple"><input type="number" step="any" data-i="'+i+'" data-k="d" aria-label="Surge duration in seconds"><input type="number" step="any" data-i="'+i+'" data-k="on" aria-label="Switch-on time in seconds"><button data-rm="'+i+'" aria-label="Remove load" style="height:30px;padding:0"><i class="ti ti-x" aria-hidden="true"></i></button>';
+el.appendChild(r);r.querySelectorAll('input').forEach(x=>{x.value=l[x.dataset.k];});});
+applyMode();}
+
+function lp(l,t){const a=onT(l);if(t<a)return 0;const pk=l.p*Math.max(1,l.m);
+if(pk<=l.p||l.d<=0.1)return t<a+0.15?l.p*(t-a)/0.15:l.p;
+if(t<a+0.1)return pk*(t-a)/0.1;if(t<a+l.d)return pk+(l.p-pk)*(t-a-0.1)/(l.d-0.1);return l.p;}
+const tot=t=>st.loads.reduce((s,l)=>s+lp(l,t),0);
+
+function analyze(){const T=st.S.T,B=st.B,iv=st.I,eta=iv.eff/100;
+const n=Math.round(T/DT);P=[];for(let i=0;i<=n;i++)P.push(tot(i*DT));
+const cont=B.qty*B.cont,pk=B.qty*B.peak,chg=B.qty*B.chg,Ah=B.Ah*B.qty;
+const amp=p=>p/eta*1000/B.V,kw=a=>a*B.V/1000*eta;
+let run=0,best=0;P.forEach(p=>{if(amp(p)>cont){run+=DT;best=Math.max(best,run);}else run=0;});
+An={cont,pk,chg,Ah,amp,kw,eta,peakP:Math.max(0,...P),endP:P[P.length-1],over:best};
+const f1=x=>x.toFixed(1),A=x=>Math.round(x),s=(c,t,d)=>chk.push({s:c,t,d});
+const per=x=>st.ph===3?' ('+f1(x/3)+' kW per phase)':'';
+chk=[];
+const pe=An.endP/iv.rated*100;
+s(pe>100?'f':pe>90?'w':'o','Inverter rating',f1(An.endP)+' kW'+per(An.endP)+' steady vs '+iv.rated+' kW'+per(iv.rated)+' rated ('+Math.round(pe)+'%)');
+s(An.peakP>iv.surge?'f':An.peakP>iv.rated?'w':'o','Inverter surge',f1(An.peakP)+' kW'+per(An.peakP)+' peak vs '+iv.surge+' kW'+per(iv.surge)+' surge and '+iv.rated+' kW rated');
+if(st.ph===3){const big=st.loads.reduce((a,l)=>l.p>a.p?l:a,{p:0,n:''}),cap=iv.rated/3;
+s(big.p>cap?'w':'n','Phase balance',big.p>cap?esc(big.n)+' draws '+f1(big.p)+' kW, more than one phase share of '+cap.toFixed(1)+' kW':'Assumes an equal split over L1, L2 and L3 ('+f1(An.endP/3)+' kW each at steady state). Appliances sit on a single phase, so uneven wiring raises the loading on the busiest phase.');}
+const ea=amp(An.endP),pa=amp(An.peakP);
+s(ea>iv.maxdc?'f':ea>0.9*iv.maxdc?'w':'o','Inverter DC current',A(ea)+' A steady vs '+iv.maxdc+' A maximum');
+s(ea>cont?'f':ea>0.8*cont?'w':'o','Battery continuous limit',A(ea)+' A steady vs '+A(cont)+' A continuous ('+(ea/Ah).toFixed(2)+'C vs '+(cont/Ah).toFixed(2)+'C)');
+let pc='o',pd=A(pa)+' A peak vs '+A(cont)+' A continuous and '+A(pk)+' A peak';
+if(pa>pk)pc='f';else if(pa>cont){pc=An.over>B.peakT?'f':'w';pd+='; above continuous for '+An.over.toFixed(1)+' s (allowed '+B.peakT+' s)';}
+s(pc,'Battery peak limit',pd);
+const us=B.V*Ah/1000*B.dod/100,dc=An.endP/eta;
+if(dc>0){const h=us/dc,hh=Math.floor(h),mm=Math.round((h-hh)*60);s('i','Runtime at steady load',us.toFixed(1)+' kWh usable at '+dc.toFixed(1)+' kW DC: about '+hh+' h '+mm+' min');}
+else s('i','Runtime at steady load','No steady load');
+$('pack').textContent='Pack: '+(B.V*Ah/1000).toFixed(1)+' kWh, '+us.toFixed(1)+' kWh usable, '+A(Ah)+' Ah, '+A(cont)+' A continuous';}
+
+const X0=44,X1=530,Y0=210,Y1=14;
+const sx=t=>X0+(X1-X0)*t/st.S.T,sy=p=>Y0-(Y0-Y1)*p/YM;
+function build(){const T=st.S.T,iv=st.I,B=st.B;
+const lim=[
+{v:An.kw(An.pk),c:'--text-danger',d:'5 4',l:'Peak '+Math.round(An.pk)+' A, '+(An.pk/An.Ah).toFixed(2)+'C'},
+{v:An.kw(An.cont),c:'--text-warning',d:'5 4',l:'Cont. '+Math.round(An.cont)+' A, '+(An.cont/An.Ah).toFixed(2)+'C'},
+{v:An.kw(An.chg),c:'--text-success',d:'5 4',l:'Charge '+Math.round(An.chg)+' A, '+(An.chg/An.Ah).toFixed(2)+'C'},
+{v:iv.rated,c:'--text-secondary',d:'2 3',l:'Inverter '+iv.rated+' kW rated'},
+{v:iv.surge,c:'--text-secondary',d:'8 3 2 3',l:'Inverter '+iv.surge+' kW surge'}];
+const mx=Math.max(An.peakP,...lim.map(x=>x.v))*1.08;
+const stp=[0.5,1,2,2.5,5,10,20,50,100,200].find(q=>mx/q<=8);YM=Math.ceil(mx/stp)*stp;
+let s='';
+const yc=Math.min(YM,lim[1].v),yp=Math.min(YM,lim[0].v);
+if(yp>yc)s+='<rect x="'+X0+'" y="'+sy(yp)+'" width="'+(X1-X0)+'" height="'+(sy(yc)-sy(yp))+'" style="fill:var(--bg-warning);opacity:0.7"/>';
+if(YM>yp)s+='<rect x="'+X0+'" y="'+Y1+'" width="'+(X1-X0)+'" height="'+(sy(yp)-Y1)+'" style="fill:var(--bg-danger);opacity:0.7"/>';
+for(let v=0;v<=YM+1e-9;v+=stp){s+='<line x1="'+X0+'" x2="'+X1+'" y1="'+sy(v)+'" y2="'+sy(v)+'" style="stroke:var(--border);stroke-width:1"/><text x="'+(X0-8)+'" y="'+(sy(v)+4)+'" text-anchor="end" style="font-size:11px;fill:var(--text-muted)">'+(Math.round(v*10)/10)+'</text>';}
+s+='<text x="'+X0+'" y="9" style="font-size:11px;fill:var(--text-muted)">AC load (kW)</text>';
+if(st.ph===3){s+='<line x1="140" x2="160" y1="6" y2="6" style="stroke:var(--fill-accent);stroke-width:2.5"/><text x="165" y="9" style="font-size:11px;fill:var(--text-secondary)">Total</text><line x1="205" x2="225" y1="6" y2="6" style="stroke:var(--text-secondary);stroke-width:2;stroke-dasharray:4 3"/><text x="230" y="9" style="font-size:11px;fill:var(--text-secondary)">Per phase (total ÷ 3)</text>';}
+const ts=T<=20?2:(T<=40?5:10);
+for(let u=0;u<=T;u+=ts){s+='<text x="'+sx(u)+'" y="228" text-anchor="middle" style="font-size:11px;fill:var(--text-muted)">'+u+' s</text>';}
+if(sy(yc)-sy(yp)>14)s+='<text x="'+(X0+6)+'" y="'+(sy((yc+yp)/2)+4)+'" style="font-size:11px;fill:var(--text-warning)">Peak zone, '+B.peakT+' s max</text>';
+if(sy(yp)-Y1>14)s+='<text x="'+(X0+6)+'" y="'+(Y1+(sy(yp)-Y1)/2+4)+'" style="font-size:11px;fill:var(--text-danger)">Above battery peak limit</text>';
+lim.forEach(x=>{s+='<line x1="'+X0+'" x2="'+X1+'" y1="'+sy(x.v)+'" y2="'+sy(x.v)+'" style="stroke:var('+x.c+');stroke-width:1.2;stroke-dasharray:'+x.d+'"/>';});
+const ls=lim.map(x=>({y:sy(x.v),c:x.c,l:x.l,ly:0})).sort((a,b)=>a.y-b.y);
+ls.forEach((x,i)=>{x.ly=i?Math.max(x.y,ls[i-1].ly+13):x.y;s+='<text x="'+(X1+8)+'" y="'+(x.ly+4)+'" style="font-size:11px;fill:var('+x.c+')">'+esc(x.l)+'</text>';});
+const gr={};st.loads.forEach(l=>{const a=onT(l);if(a>0&&a<=T){(gr[a]=gr[a]||[]).push(l.n);}});
+let lastx=-99;Object.keys(gr).map(Number).sort((a,b)=>a-b).forEach(k=>{const x=sx(k);
+s+='<line x1="'+x+'" x2="'+x+'" y1="'+Y1+'" y2="'+Y0+'" style="stroke:var(--border-strong);stroke-width:1;stroke-dasharray:2 3"/>';
+if(x-lastx>58){const nm=gr[k].length>1?gr[k].length+' loads on':gr[k][0].slice(0,12)+' on';s+='<text x="'+x+'" y="246" text-anchor="middle" style="font-size:11px;fill:var(--text-secondary)">'+esc(nm)+'</text>';lastx=x;}});
+if(st.ph===3)s+='<polyline id="ln3" points="" fill="none" style="stroke:var(--text-secondary);stroke-width:2;stroke-dasharray:4 3;stroke-linejoin:round"/>';
+s+='<polyline id="ln" points="" fill="none" style="stroke:var(--fill-accent);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round"/><circle id="dot" r="5" cx="'+X0+'" cy="'+sy(0)+'" style="fill:var(--fill-accent);stroke:var(--surface-2);stroke-width:2"/>';
+$('g').innerHTML=s;$('scrub').max=T;}
+
+function renderChecks(){
+const ic={o:['ti-circle-check','--text-success'],w:['ti-alert-triangle','--text-warning'],f:['ti-circle-x','--text-danger'],i:['ti-clock','--text-secondary'],n:['ti-info-circle','--text-secondary']};
+const worst=chk.some(c=>c.s==='f')?'f':chk.some(c=>c.s==='w')?'w':'o';
+const hd={o:['All limits are within range','--bg-success','--text-success'],w:['Works, but some limits are close or exceeded briefly','--bg-warning','--text-warning'],f:['Overloaded: at least one limit is exceeded','--bg-danger','--text-danger']}[worst];
+$('checks').innerHTML='<div style="background:var('+hd[1]+');color:var('+hd[2]+');padding:10px 14px;border-radius:var(--radius);font-size:14px;font-weight:500;margin:0 0 6px">'+hd[0]+'</div>'+chk.map((c,i)=>'<div style="display:flex;gap:10px;padding:8px 2px;'+(i?'border-top:0.5px solid var(--border);':'')+'"><i class="ti '+ic[c.s][0]+'" style="font-size:20px;color:var('+ic[c.s][1]+')" aria-hidden="true"></i><div><div style="font-size:14px;font-weight:500">'+c.t+'</div><div style="font-size:13px;color:var(--text-secondary)">'+c.d+'</div></div></div>').join('');}
+
+function render(){const T=st.S.T;t=Math.min(t,T);
+const n=Math.min(P.length-1,Math.round(t/DT));let pts=[],pt3=[],pk=0;
+for(let i=0;i<=n;i++){pts.push(sx(i*DT).toFixed(1)+','+sy(P[i]).toFixed(1));pt3.push(sx(i*DT).toFixed(1)+','+sy(P[i]/3).toFixed(1));pk=Math.max(pk,P[i]);}
+const p=tot(t),amp=An.amp(p);
+$('ln').setAttribute('points',pts.join(' '));$('dot').setAttribute('cx',sx(t));$('dot').setAttribute('cy',sy(p));
+if($('ln3'))$('ln3').setAttribute('points',pt3.join(' '));
+$('mTotal').textContent=p.toFixed(1);$('mPh').textContent=(p/3).toFixed(1);$('mAmp').textContent=Math.round(amp);
+const cr=amp/An.Ah;$('mC').textContent=cr.toFixed(2);
+$('mC').style.color=amp>An.pk?'var(--text-danger)':(amp>An.cont?'var(--text-warning)':'');
+$('mAmp').style.color=$('mC').style.color;
+const pc=Math.round(p/st.I.rated*100);$('mPct').textContent=pc;$('mPct').style.color=pc>100?'var(--text-warning)':'';
+$('mPeak').textContent=pk.toFixed(1);$('mPeak').style.color=pk>st.I.rated?'var(--text-warning)':'';
+$('tOut').textContent=t.toFixed(1);$('scrub').value=t;}
+
+function recompute(){analyze();build();renderChecks();render();}
+function setBtn(){$('playTxt').textContent=playing?'Pause':(t>=st.S.T?'Replay':'Play');$('playIcon').className='ti '+(playing?'ti-player-pause':(t>=st.S.T?'ti-refresh':'ti-player-play'));}
+function bad(x,m){x.style.borderColor='var(--border-danger)';$('err').textContent=m;}
+function good(x){x.style.borderColor='';$('err').textContent='';}
+function setMode(m){st.mode=m;applyMode();t=0;playing=true;last=null;recompute();setBtn();}
+function setPhase(n){st.ph=n;applyPhase();recompute();}
+
+document.addEventListener('input',e=>{const x=e.target;
+if(x.dataset.g){const f=defs[x.dataset.g].find(q=>q[0]===x.dataset.o);let v=parseFloat(x.value);if(x.dataset.o==='qty')v=Math.round(v);
+if(!isFinite(v)||v<f[3]||v>f[4]){bad(x,'Enter a value for '+f[1].toLowerCase()+' between '+f[3]+' and '+f[4]);return;}
+st[x.dataset.g][x.dataset.o]=v;applyMode();}
+else if(x.dataset.k){const k=x.dataset.k,l=st.loads[+x.dataset.i];
+if(k==='n'){l.n=x.value;}
+else{const v=parseFloat(x.value),mn={p:0,m:1,d:0,on:0}[k];if(!isFinite(v)||v<mn){bad(x,'Enter a number of '+mn+' or more');return;}l[k]=v;}}
+else return;
+good(x);recompute();setBtn();});
+$('loads').addEventListener('click',e=>{const b=e.target.closest('button[data-rm]');if(!b)return;st.loads.splice(+b.dataset.rm,1);buildLoads();recompute();});
+$('add').addEventListener('click',()=>{st.loads.push({n:'New load',p:1,m:1,d:0,on:Math.min(st.S.T,Math.round(st.S.T*0.5))});buildLoads();recompute();});
+$('mSeq').addEventListener('click',()=>setMode('seq'));
+$('mAll').addEventListener('click',()=>setMode('all'));
+$('p1').addEventListener('click',()=>setPhase(1));
+$('p3').addEventListener('click',()=>setPhase(3));
+$('reset').addEventListener('click',()=>{st=mkDef();fill();buildLoads();applyPhase();t=0;playing=true;last=null;$('err').textContent='';recompute();setBtn();});
+$('play').addEventListener('click',()=>{if(!playing&&t>=st.S.T)t=0;playing=!playing;setBtn();render();});
+$('scrub').addEventListener('input',e=>{t=parseFloat(e.target.value);playing=false;setBtn();render();});
+function tick(ts){if(last===null)last=ts;const dt=(ts-last)/1000;last=ts;
+if(playing){t=Math.min(st.S.T,t+dt);if(t>=st.S.T){playing=false;setBtn();}render();}
+requestAnimationFrame(tick);}
+fill();buildLoads();applyPhase();recompute();setBtn();requestAnimationFrame(tick);
+</script></div>
+
+{% endverbatim %}
+<p class="note-box">Rated and surge output are the inverter totals. Power factor and PV input are not modelled.</p>
+</main>
+{% include "quotations/_pwa_register.html" %}
+</body>
+</html>

@@ -114,6 +114,15 @@ EARTHING_CABLE_METRES = Decimal("20")  # earthing cable length (m).  ASSUMED - t
 ZERO = Decimal("0")
 HUNDRED = Decimal("100")
 
+# ---- ENPHASE MICROINVERTERS (one inverter and one Q cable on EVERY panel) ----------------------------------------
+# The parts are Products (category Other); the numbers below come from the Enphase sheet (house phase / system phase).
+ENPHASE_PARTS = {"envoy": "ENPHASE ENVOY S", "relay_1p": "ENPHASE IQ RELAY 1P", "relay_3p": "ENPHASE IQ RELAY 3P",
+                 "ct": "ENPHASE CT 200 SPLIT", "q_cable": "ENPHASE Q CABLE 1.3M", "q_term": "ENPHASE Q TERM"}
+ENPHASE_THREE_PHASE_FROM_KW = Decimal("5")           # a three-phase house gets a three-phase system from this plant size; smaller = single-phase system
+ENPHASE_CT_COUNT = {("1", "1"): 2, ("3", "3"): 6, ("3", "1"): 4}      # (house phase, system phase) -> CT 200 Split
+ENPHASE_SINGLE_PHASE_BRANCH = {"IQ8P": 7, "IQ8HC": 9}                  # panels on one single-phase branch = one Q Term per branch
+ENPHASE_THREE_PHASE_PANELS = {"IQ8P": 21, "IQ8HC": 27}                 # panels a three-phase system takes with 3 Q Terms
+
 # Words in a QuotationItem description that tell us where its cost really belongs
 CHARGE_WORDS = ("ELECTRICAL WORK", "TRANSPORT", "KSEB", "LOADING", "DOCUMENTATION", "WAGE")
 STRUCTURE_WORDS = ("STRUCTURE", "MOUNTING")
@@ -388,8 +397,11 @@ def find_product(category, name=None, prefix=None, contains=(), capacity=None):
     from .models import Product                      # imported here so this module can be tested without Django
 
     queryset = Product.objects.filter(category=category, is_active=True)
-    if category == "inverter" and "HYBRID" not in " ".join([clean_text(name), clean_text(prefix)] + [clean_text(c) for c in contains]).upper():
-        queryset = queryset.exclude(name__icontains="HYBRID")      # the hybrid inverters are only found when asked for by name
+    if category == "inverter":
+        asked = " ".join([clean_text(name), clean_text(prefix)] + [clean_text(c) for c in contains]).upper()
+        for word in ("HYBRID", "MICRO"):                           # hybrid and micro inverters are only found when asked for
+            if word not in asked:
+                queryset = queryset.exclude(name__icontains=word)
     if name:
         queryset = queryset.filter(name__iexact=name)
     if prefix:
@@ -421,6 +433,35 @@ def default_hybrid_inverter(kw, token):
         if found is not None:
             return found
     return base.order_by("-inverter_capacity", "name").first()
+
+
+def is_micro(name):
+    """True for an Enphase microinverter product (one inverter per panel)."""
+    return "MICRO" in clean_text(name).upper()
+
+
+def micro_model(name):
+    return "IQ8HC" if "IQ8HC" in clean_text(name).upper() else "IQ8P"
+
+
+def enphase_system_phase(quotation):
+    """'1' or '3': a single-phase house has a single-phase system; a three-phase house has a three-phase system from 5 kW."""
+    if _phase_token(quotation) == "1PH":
+        return "1"
+    return "3" if decimal_or_zero(quotation.system_size) >= ENPHASE_THREE_PHASE_FROM_KW else "1"
+
+
+def enphase_counts(quotation, panels, model):
+    """How many of each Enphase part one plant needs -> {part key: quantity}."""
+    house = "3" if _phase_token(quotation) == "3PH" else "1"
+    system = enphase_system_phase(quotation)
+    panels = int(panels)
+    if system == "3":
+        q_term = 3 * max(-(-panels // ENPHASE_THREE_PHASE_PANELS[model]), 1)
+    else:
+        q_term = max(-(-panels // ENPHASE_SINGLE_PHASE_BRANCH[model]), 1)
+    return {"envoy": 1, "relay_3p" if house == "3" else "relay_1p": 1, "ct": ENPHASE_CT_COUNT.get((house, system), 2),
+            "q_cable": panels, "q_term": q_term}
 
 
 def default_hybrid_battery(inverter_name):
@@ -467,6 +508,10 @@ def rate_sheet_requirements():
     for key, label, category, prefix, by_phase, quantity in RATE_SHEET_COMPONENTS:
         if not by_phase:
             rows.append({"label": label, "category": category, "product": find_product(category, prefix=prefix)})
+    for key, text in ENPHASE_PARTS.items():
+        rows.append({"label": "Enphase %s" % key.replace("_", " "), "category": "other", "product": find_product("other", name=text)})
+    for text in ("ENPHASE IQ8P-72-INT MICRO", "ENPHASE IQ8HC MICRO"):
+        rows.append({"label": text, "category": "inverter", "product": find_product("inverter", name=text)})
     rows.append({"label": "Hybrid battery", "category": "battery", "product": find_product("battery")})
     rows.append({"label": "Hybrid battery MCCB box", "category": "battery_box", "product": find_product("battery_box")})
     for kw in ("3", "3.6", "5", "6", "8", "10"):
@@ -605,6 +650,7 @@ def _compute(quotation):
                 "ac_wire": clean_text(quotation.ac_wire)}
 
     inverter_kw = decimal_or_zero(quotation.inverter_kw) or Decimal(quotation.system_size or 0)
+    micro_name = ""
     if selected["inverter_type"].lower() == "other":
         rate = decimal_or_zero(quotation.inverter_rate)
         components["inverter"] = {"name": clean_text(quotation.inverter_make) or "Other inverter", "make": clean_text(quotation.inverter_make),
@@ -624,9 +670,16 @@ def _compute(quotation):
                 inverter = find_product("inverter", capacity=inverter_kw)
             if selected["inverter_type"] and inverter is not None:
                 warnings.append("Inverter '%s' is not in the rate sheet; %s was used instead." % (selected["inverter_type"], inverter.name))
-        price("inverter", "Inverter", inverter, 1,
+        micro = inverter is not None and is_micro(inverter.name)
+        total_panels = (panel_quantity or ZERO) + (panel2_quantity or ZERO)
+        if micro and total_panels <= 0:
+            warnings.append("The microinverters are one per panel, but no panel is selected yet.")
+        price("inverter", "Inverter", inverter, total_panels if micro else 1,
               "No inverter rate found for %s kW %s. Add it in Admin > Products (category inverter, capacity %s, name containing %s)."
               % (plain_number(inverter_kw), token, plain_number(inverter_kw), token))
+        if micro:
+            micro_name = inverter.name
+            inverter_kw = Decimal(quotation.system_size or 0)           # the plant's kW (KSEB fee)
         if inverter is not None:
             selected["inverter_type"] = inverter.name
             traits = inverter_traits(inverter.name, getattr(inverter, "inverter_capacity", None))
@@ -688,6 +741,15 @@ def _compute(quotation):
         battery_box = find_product("battery_box")
         if battery_box is not None:                       # optional: no active box product = no box in the price
             price("battery_box", "Battery MCCB box", battery_box, 1, "")
+
+    # ---- ENPHASE: one Q cable per panel and the gateway, relay, CTs and Q Terms of the sheet ----
+    if micro_name:
+        counts = enphase_counts(quotation, (panel_quantity or ZERO) + (panel2_quantity or ZERO), micro_model(micro_name))
+        for key, label in (("envoy", "Enphase Envoy S gateway"), ("relay_1p", "Enphase IQ Relay (single phase)"), ("relay_3p", "Enphase IQ Relay (three phase)"),
+                           ("ct", "Enphase CT 200 Split"), ("q_cable", "Enphase Q Cable"), ("q_term", "Enphase Q Term")):
+            if key in counts:
+                price("micro_" + key, label, find_product("other", name=ENPHASE_PARTS[key]), counts[key],
+                      "No rate found for %s. Add it in Admin > Products (category Other, name %s)." % (label, ENPHASE_PARTS[key]))
 
     components_total = money(sum((c["amount"] for c in components.values()), ZERO))
     bos_amount = money(bos_amount_for(quotation.system_size, token))

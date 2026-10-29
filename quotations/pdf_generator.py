@@ -20,7 +20,7 @@ from pathlib import Path
 from pypdf import PdfReader, PdfWriter
 
 from . import pdf_layout as L
-from .calculations import GST_RATE, find_quotation_item, is_hybrid, is_tata, structure_kind
+from .calculations import GST_RATE, find_quotation_item, is_hybrid, is_micro, micro_model, is_tata, structure_kind
 from .pdf_boq_sample import SAMPLE_BOQ
 
 DESIGN_DIR = Path(__file__).resolve().parent / "pdf_design"
@@ -252,6 +252,12 @@ def _inverter_make(q):
 def _row_inverter(q, item, row):
     """kW, phase and MPPT come from the INVERTER that was selected (e.g. a 5 kW single-phase inverter on a 3 kW three-phase plant)."""
     comp = _comp(q, "inverter")
+    if is_micro(q.inverter_type):                       # Enphase: one microinverter on every panel (the sample "5 kW Enphase" quotation)
+        count = lambda key: L.fmt_num(_comp(q, key).get("quantity") or 0)
+        relay = "micro_relay_3p" if _comp(q, "micro_relay_3p").get("quantity") else "micro_relay_1p"
+        qty_lines = ["MI-%s" % L.fmt_num(comp.get("quantity") or 0), "Envoy -%s" % count("micro_envoy"), "Q Relay-%s" % count(relay),
+                     "Q Term-%s" % count("micro_q_term"), "CT-%s" % count("micro_ct")]
+        return {"spec": MICRO_SPEC[micro_model(q.inverter_type)], "qty": L.text_html("\n".join(qty_lines)), "make": "ENPHASE"}
     chosen = ((q.inverter_type or "") + " " + (getattr(getattr(item, "product", None), "name", "") or "")).upper()
     kw = comp.get("capacity") or q.inverter_kw or q.system_size
     phase = comp.get("phase") or ("THREE" if _three_phase(q) else "SINGLE")          # only an unnamed ('other') inverter falls back to the plant
@@ -269,6 +275,15 @@ def _row_inverter(q, item, row):
     if make:
         out["make"] = make
     return out
+
+
+MICRO_SPEC = {
+    "IQ8P": "IQ8P: high-power, grid-ready microinverter delivering up to 480 VA (475 W continuous) output with ~97% efficiency, supporting PV modules "
+            "up to 670 Wp within a 16\u201365 V operating range, housed in a compact, double-insulated, and rapid-shutdown-capable enclosure.\n"
+            "Warranty: 15 Years, expandable up to 25 years For MI",
+    "IQ8HC": "IQ8HC: grid-ready microinverter for bifacial PV modules, housed in a compact, double-insulated, and rapid-shutdown-capable enclosure.\n"
+             "Warranty: 15 Years, expandable up to 25 years For MI",
+}
 
 
 def _warranty_years(name):
@@ -417,7 +432,34 @@ def _boq_rows(q):
         if battery is not None:
             rows[1]["rowspan"] = 2                                    # the sample: the battery is a second line of the inverter's number
             rows.insert(2, battery)
+    if is_micro(q.inverter_type):
+        rows = _micro_rows(rows)
     return rows
+
+
+def _micro_rows(rows):
+    """
+    The Enphase sample quotation: the inverter row is "Micro-Inverter", there is no DCDB (a microinverter has no DC side), the cable
+    accessories and the conduits are one row, the DC cable is "As Per Requirement", and the rows are numbered again.
+    """
+    kept = []
+    for row in rows:
+        if row["sr"] == 2:
+            row["particular"] = L.text_html("Micro-Inverter")
+        elif row["sr"] == 5:                                          # DCDB
+            continue
+        elif row["sr"] == 7:                                          # DC cable
+            row["qty"] = "As Per Requirement"
+        elif row["sr"] == 13:                                         # cable accessories + conduits
+            row["particular"] = L.text_html("Cable Accessories &\nConduits")
+            row["qty"] = "As Per Requirement"
+            row["make"] = "Satubli &\nFINOLEX/PRECISION"
+        elif row["sr"] == 14:
+            continue
+        kept.append(row)
+    for number, row in enumerate(kept, 1):
+        row["sr"] = number
+    return kept
 
 
 def _battery_row(q):
@@ -518,6 +560,8 @@ def _system_size_text(q):
 
 def _inverter_text(q):
     kw = _comp(q, "inverter").get("capacity") or q.inverter_kw or q.system_size       # the inverter's own kW
+    if is_micro(q.inverter_type):
+        return "Enphase %s" % micro_model(q.inverter_type)                                  # the sample: "Enphase IQ8P"
     if is_hybrid(q):
         return ("%s Hybrid %skW" % (_inverter_make(q), L.fmt_num(kw))).strip()          # the sample: "SOLAIRE Hybrid 5kW"
     return ("%s %s KW" % (_inverter_make(q), L.fmt_num(kw))).strip()

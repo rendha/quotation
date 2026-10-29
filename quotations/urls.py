@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_not_required
+from django.views.generic import TemplateView
 from . import pwa_views, reports
 
 urlpatterns = [
@@ -11,6 +12,7 @@ urlpatterns = [
     path( "quotation/<int:quotation_id>/pdf",views.quotation_pdf,name="quotation_pdf"),
     path("person/", views.person_dashboard, name="person_dashboard"),
     path("report/", reports.daily_report, name="daily_report"),
+    path("hybrid-calculator/", TemplateView.as_view(template_name="quotations/hybrid_calculator.html"), name="hybrid_calculator"),
     path("login/", login_not_required(auth_views.LoginView.as_view(
         template_name="quotations/login.html", redirect_authenticated_user=True, next_page="quotation_dashboard")), name="login"),
     path("logout/", auth_views.LogoutView.as_view(next_page="login"), name="logout"),

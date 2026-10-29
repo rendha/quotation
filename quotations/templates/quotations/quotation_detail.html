@@ -220,6 +220,7 @@
                         <option value="{{ panel.id }}"
                                 data-wattage="{{ panel.wattage }}"
                                 data-rate="{{ panel.rate_per_watt }}"
+                                data-tech="{{ panel.panel_type }}"
                                 {% if quotation.panel_option_id == panel.id %}selected{% endif %}>
                             {{ panel.company }} - {{ panel.panel_type }} - {{ panel.wattage|floatformat:"-2" }}W - {{ panel.get_dcr_status_display }}
                         </option>
@@ -325,7 +326,7 @@
                 <select name="inverter_type" id="inverter_type" required onchange="toggleOtherInverter()">
                     <option value="">Select Inverter</option>
                     {% for product in inverter_products %}
-                        <option value="{{ product.name }}" {% if quotation.inverter_type == product.name %}selected{% endif %}>
+                        <option value="{{ product.name }}" {% if "MICRO" in product.name %}data-micro="{% if "IQ8HC" in product.name %}IQ8HC{% else %}IQ8P{% endif %}"{% endif %} {% if quotation.inverter_type == product.name %}selected{% endif %}>
                             {{ product.name }}{% if product.make %} - {{ product.make }}{% endif %} {% if show_rates %}(&#8377;{{ product.rate|floatformat:2 }}){% endif %}
                         </option>
                     {% empty %}
@@ -762,7 +763,23 @@ function updateStructureWatts() {
     box.value = String(Math.round(watts * 100) / 100) + " W";
 }
 
+/* Enphase: TOPCon panels take only the IQ8P microinverter; bifacial panels take the IQ8P or the IQ8HC */
+function filterMicroInverters() {
+    const panel = document.getElementById("panel_option"), inverter = document.getElementById("inverter_type");
+    if (!panel || !inverter) { return; }
+    const tech = panel.selectedIndex > 0 ? (panel.options[panel.selectedIndex].dataset.tech || "").toUpperCase() : "";
+    const onlyP = tech.indexOf("TOPCON") >= 0;
+    Array.from(inverter.options).forEach(function (o) {
+        if (o.dataset.micro === "IQ8HC") { o.hidden = onlyP; o.disabled = onlyP; }
+    });
+    const chosen = inverter.options[inverter.selectedIndex];
+    if (chosen && chosen.disabled) { inverter.value = ""; }
+}
+
 document.addEventListener("DOMContentLoaded", function () {
+    const panelSelect = document.getElementById("panel_option");
+    if (panelSelect) { panelSelect.addEventListener("change", filterMicroInverters); }
+    filterMicroInverters();
     const offer = document.getElementById("offer_second_panel"), secondBox = document.getElementById("second-panel-box");
     if (offer && secondBox) {                       /* DCR / Non-DCR: the second panel box is shown only after the tick; unticking clears it */
         offer.addEventListener("change", function () {

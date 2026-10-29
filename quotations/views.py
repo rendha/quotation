@@ -529,6 +529,12 @@ def quotation_detail(request, quotation_id):
                 quotation.inverter_make = other_inverter_name
                 quotation.inverter_rate = other_inverter_rate
 
+        # ---- Enphase: on-grid only; the IQ8HC microinverter is for bifacial panels only ----
+        if "MICRO" in inverter_type.upper() and "on" not in clean_text(quotation.system_type).lower()[:2]:
+            return HttpResponseBadRequest("The Enphase microinverters are for On-Grid quotations only.")
+        if "IQ8HC" in inverter_type.upper() and quotation.panel_option is not None and "TOPCON" in (quotation.panel_option.panel_type or "").upper():
+            return HttpResponseBadRequest("The IQ8HC microinverter is for bifacial panels. For TOPCon panels use the IQ8P.")
+
         # ---- hybrid: the battery and how many ----
         if is_hybrid(quotation):
             quotation.battery_type = clean_text(request.POST.get("battery_type"))
@@ -626,6 +632,8 @@ def quotation_detail(request, quotation_id):
         inverter_products = Product.objects.filter(category="inverter", is_active=True, rate__gt=0).exclude(name__icontains="HYBRID").filter(
             Q(inverter_capacity__in=allowed_kws) | Q(inverter_capacity__isnull=True) | Q(inverter_capacity__lte=0)
             | Q(name=clean_text(quotation.inverter_type))).order_by("name")
+        if "off" in clean_text(quotation.system_type).lower():             # Enphase microinverters are for on-grid plants only
+            inverter_products = inverter_products.exclude(name__icontains="MICRO")
     saved_kw = decimal_or_zero(quotation.inverter_kw)
     kw_options = sorted(set(allowed_kws) | ({int(saved_kw) if saved_kw == int(saved_kw) else saved_kw} if saved_kw > 0 else set()))
 

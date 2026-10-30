@@ -639,10 +639,12 @@ def bank_details():
 def generate_quotation_pdf(quotation):
     q = quotation
     base = {"assets": ASSETS_URI}
+    boq_rows = _boq_rows(q)
+    wide_qty = any("Requirement" in str(r["qty"]) for r in boq_rows)          # "As Per Requirement" needs a wider QTY column (Enphase)
     parts = [
         _part("cover.html", dict(base, cover_fields=_cover_fields(q))),
         PdfReader(str(ASSETS_DIR / "page_welcome.pdf")),
-        _part("boq.html", dict(base, boq_rows=_boq_rows(q), customer_lines=_customer_lines(q), price_rows=_price_summary(q))),
+        _part("boq.html", dict(base, boq_rows=boq_rows, wide_qty=wide_qty, customer_lines=_customer_lines(q), price_rows=_price_summary(q))),
         _part("summary.html", dict(
             base,
             summary_rows=_summary_rows(q),

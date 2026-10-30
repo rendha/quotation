@@ -15,7 +15,7 @@ td.part { vertical-align: middle; }
 <body>
 <h1>BOQ</h1>
 <table class="boq">
-  <thead><tr><th style="width:47pt">Sr.No</th><th style="width:100pt">Particular</th><th>Specification</th><th style="width:32pt">QTY</th><th style="width:103pt">MAKE</th></tr></thead>
+  <thead><tr><th style="width:47pt">Sr.No</th><th style="width:100pt">Particular</th><th>Specification</th><th style="width:{% if wide_qty %}58{% else %}32{% endif %}pt">QTY</th><th style="width:103pt">MAKE</th></tr></thead>
   <tbody>
   {% for r in boq_rows %}<tr>
     {% if not r.skip_sr %}<td{% if r.rowspan %} rowspan="{{ r.rowspan }}"{% endif %}>{{ r.sr }}</td>{% endif %}<td class="part">{{ r.particular }}</td><td>{{ r.spec }}</td><td>{{ r.qty }}</td><td>{{ r.make }}</td>

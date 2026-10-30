@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dehlsen Energy - Monthly report {{ first|date:"F Y" }}</title>
+    {% include "quotations/_pwa_head.html" %}
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Arial, sans-serif; background: #eef2f7; color: #1f2937; }
+        .page { max-width: 960px; margin: 18px auto; background: white; padding: 34px 38px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+        .tools { max-width: 960px; margin: 14px auto 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 12px; }
+        .tools a, .tools button { background: white; border: 1px solid #cbd5e1; color: #1f2937; padding: 8px 12px; border-radius: 8px; text-decoration: none; font-size: 14px; cursor: pointer; font-family: inherit; }
+        .tools .primary { background: #3B73B9; border-color: #3B73B9; color: white; }
+        .letterhead { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 4px solid #3B73B9; padding-bottom: 12px; }
+        .letterhead .co { color: #3B73B9; font-weight: bold; font-size: 15px; letter-spacing: .5px; }
+        .letterhead h1 { margin: 4px 0 0; font-size: 28px; }
+        .letterhead .when { text-align: right; font-size: 20px; font-weight: bold; color: #3B73B9; }
+        .letterhead .when small { display: block; color: #64748b; font-size: 12px; font-weight: normal; }
+        h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .6px; color: #3B73B9; border-bottom: 1px solid #dbe4ef; padding-bottom: 5px; margin: 26px 0 10px; }
+        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 10px; }
+        .stat { border: 1px solid #dbe4ef; border-radius: 8px; padding: 10px 12px; background: #f8fafc; }
+        .stat .l { color: #64748b; font-size: 11px; text-transform: uppercase; } .stat .v { font-size: 21px; font-weight: bold; margin-top: 2px; }
+        .stat .s { color: #64748b; font-size: 12px; }
+        .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .hi { border: 1px solid #dbe4ef; border-left: 5px solid #3B73B9; border-radius: 8px; padding: 10px 14px; background: #f8fafc; }
+        .hi .t { color: #64748b; font-size: 11px; text-transform: uppercase; } .hi .big { font-size: 22px; font-weight: bold; }
+        .hi .gold { color: #b45309; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px; vertical-align: top; }
+        th { color: #64748b; font-size: 11px; text-transform: uppercase; background: #f8fafc; }
+        .r { text-align: right; } .muted { color: #64748b; } .neg { color: #b91c1c; } .pos { color: #15803d; }
+        .bar { background: #e2e8f0; border-radius: 4px; height: 9px; min-width: 70px; } .bar i { display: block; height: 9px; border-radius: 4px; background: #3B73B9; }
+        .chart { display: flex; align-items: flex-end; gap: 3px; height: 150px; border-bottom: 2px solid #94a3b8; padding: 18px 0 0 26px; position: relative; }
+        .chart .col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+        .chart .col b { font-size: 10px; color: #475569; line-height: 12px; height: 12px; }
+        .chart .col i { display: block; width: 100%; background: #3B73B9; border-radius: 3px 3px 0 0; }
+        .chart .col.sun i { background: #94a3b8; }
+        .chart .max { position: absolute; left: 0; top: 8px; font-size: 10px; color: #64748b; }
+        .chart-days { display: flex; gap: 3px; padding-left: 26px; }
+        .chart-days span { flex: 1; min-width: 0; text-align: center; font-size: 9px; color: #64748b; padding-top: 3px; }
+        .tablebox { overflow-x: auto; }
+        a { color: #3B73B9; }
+        .gold-row td { background: #fffbeb; }
+        .foot { margin-top: 26px; padding-top: 10px; border-top: 1px solid #dbe4ef; color: #64748b; font-size: 11px; }
+        @media (max-width: 700px) { .page { padding: 18px 14px; margin: 8px 0; } .two { grid-template-columns: 1fr; } .letterhead { display: block; } .letterhead .when { text-align: left; margin-top: 8px; } }
+        @media print {
+            body { background: white; }
+            .tools { display: none; }
+            .page { box-shadow: none; margin: 0; max-width: none; padding: 0; }
+            h2 { break-after: avoid; } tr, .hi, .stat { break-inside: avoid; }
+            .bar, .bar i, .chart .col i, .stat, .hi, th, .gold-row td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+<div class="tools">
+    <a href="{% url 'quotation_dashboard' %}">&larr; Quotations</a>
+    <a href="?month={{ previous|date:'Y-m' }}">&lsaquo; {{ previous|date:"M Y" }}</a>
+    <a href="?month={{ this_month|date:'Y-m' }}" {% if is_this_month %}class="primary"{% endif %}>This month</a>
+    <a href="?month={{ last_month|date:'Y-m' }}">Last month</a>
+    {% if next %}<a href="?month={{ next|date:'Y-m' }}">{{ next|date:"M Y" }} &rsaquo;</a>{% endif %}
+    <form method="get" style="display:flex;gap:6px;margin:0"><input type="month" name="month" value="{{ first|date:'Y-m' }}" max="{{ this_month|date:'Y-m' }}" style="padding:7px;border:1px solid #cbd5e1;border-radius:8px"><button type="submit">Show</button></form>
+    <span style="flex:1"></span>
+    <a href="?month={{ first|date:'Y-m' }}&format=csv">Download Excel (CSV)</a>
+    <button type="button" class="primary" onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<div class="page">
+    <div class="letterhead">
+        <div><div class="co">DEHLSEN ENERGY</div><h1>Monthly Quotation Report</h1></div>
+        <div class="when">{{ first|date:"F Y" }}<small>{% if is_this_month %}Up to {{ printed|date:"d M Y" }} (month not finished){% else %}Full month{% endif %}</small></div>
+    </div>
+
+    <h2>1. Summary</h2>
+    <div class="stats">
+        <div class="stat"><div class="l">Quotations made</div><div class="v">{{ totals.count }}</div><div class="s">{{ per_day }} a day on average</div></div>
+        <div class="stat"><div class="l">Clients</div><div class="v">{{ totals.clients }}</div></div>
+        <div class="stat"><div class="l">Total kW</div><div class="v">{{ totals.kw_display }}</div><div class="s">avg {{ average_kw }} kW per client</div></div>
+        <div class="stat"><div class="l">Quotation value</div><div class="v">{{ totals.value_display }}</div><div class="s">avg &#8377;{{ average_value }} per client</div></div>
+        <div class="stat"><div class="l">Profit (margin)</div><div class="v {% if totals.profit_negative %}neg{% endif %}">{{ totals.profit_display }}</div></div>
+        <div class="stat"><div class="l">Confirmed customers</div><div class="v">{{ confirmed.clients }}</div><div class="s">{{ conversion }}% of clients &middot; {{ confirmed.value_display }}</div></div>
+    </div>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">kW, value and profit count one quotation per client (the confirmed one, else the lowest price), the same way as the dashboard and the daily report.
+        {% if no_name %}{{ no_name }} quotation{{ no_name|pluralize }} {{ no_name|pluralize:"has,have" }} no "Quotation For" name.{% endif %}</p>
+
+    <h2>2. Highlights</h2>
+    <div class="two">
+        <div class="hi">
+            <div class="t">Highest quotation of the month</div>
+            {% if highest %}
+                <div class="big gold">&#8377;{{ highest.price }}</div>
+                <div><b>{{ highest.person }}</b> &middot; {{ highest.business }}</div>
+                <div class="muted">{{ highest.offer_no }} &middot; {{ highest.kw }} kW {{ highest.system }} &middot; {{ highest.day|date:"d M" }}{% if highest.location %} &middot; {{ highest.location }}{% endif %}</div>
+            {% else %}<div class="muted">No priced quotation this month.</div>{% endif %}
+        </div>
+        <div class="hi">
+            <div class="t">Lowest priced quotation</div>
+            {% if lowest %}
+                <div class="big">&#8377;{{ lowest.price }}</div>
+                <div><b>{{ lowest.person }}</b> &middot; {{ lowest.business }}</div>
+                <div class="muted">{{ lowest.offer_no }} &middot; {{ lowest.kw }} kW {{ lowest.system }} &middot; {{ lowest.day|date:"d M" }}</div>
+            {% else %}<div class="muted">&mdash;</div>{% endif %}
+        </div>
+        <div class="hi">
+            <div class="t">Most quotations</div>
+            {% if most_quotations %}<div class="big">{{ most_quotations.name }}</div><div class="muted">{{ most_quotations.count }} quotation{{ most_quotations.count|pluralize }} &middot; {{ most_quotations.value_display }}</div>{% else %}<div class="muted">&mdash;</div>{% endif %}
+        </div>
+        <div class="hi">
+            <div class="t">Highest total value</div>
+            {% if most_value %}<div class="big">{{ most_value.name }}</div><div class="muted">{{ most_value.value_display }} &middot; {{ most_value.count }} quotation{{ most_value.count|pluralize }} &middot; {{ most_value.kw_display }}</div>{% else %}<div class="muted">&mdash;</div>{% endif %}
+        </div>
+        <div class="hi">
+            <div class="t">Biggest plant quoted</div>
+            {% if biggest_kw %}<div class="big">{{ biggest_kw.kw }} kW</div><div class="muted">{{ biggest_kw.person }} &middot; {{ biggest_kw.business }} &middot; {{ biggest_kw.offer_no }}</div>{% else %}<div class="muted">&mdash;</div>{% endif %}
+        </div>
+        <div class="hi">
+            <div class="t">Busiest day</div>
+            {% if best_day %}<div class="big">{{ best_day.day|date:"d M, l" }}</div><div class="muted">{{ best_day.count }} quotation{{ best_day.count|pluralize }} &middot; {{ best_day.value_display }} &middot; {{ active_days }} active day{{ active_days|pluralize }} of {{ days_passed }}</div>{% else %}<div class="muted">&mdash;</div>{% endif %}
+        </div>
+    </div>
+
+    <h2>3. This month against last month ({{ previous_name|date:"F Y" }})</h2>
+    <div class="tablebox"><table>
+        <thead><tr><th></th><th class="r">{{ first|date:"M Y" }}</th><th class="r">{{ previous_name|date:"M Y" }}</th><th class="r">Change</th></tr></thead>
+        <tbody>
+        {% for c in changes %}
+            <tr><td>{{ c.label }}</td><td class="r"><b>{{ c.now }}</b></td><td class="r muted">{{ c.before }}</td>
+                <td class="r {% if c.down %}neg{% else %}pos{% endif %}">{{ c.change|default:"&mdash;" }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+
+    <h2>4. Who made how many</h2>
+    <div class="tablebox"><table>
+        <thead><tr><th>#</th><th>Person</th><th class="r">Quotations</th><th class="r">Confirmed</th><th class="r">kW</th><th class="r">Value</th><th>Share of value</th><th class="r">Profit</th><th>Their highest quotation</th></tr></thead>
+        <tbody>
+        {% for p in people %}
+            <tr><td>{{ p.rank }}</td><td><b>{{ p.name }}</b></td><td class="r">{{ p.count }}</td><td class="r">{{ p.confirmed }}</td><td class="r">{{ p.kw_display }}</td>
+                <td class="r"><b>{{ p.value_display }}</b></td><td><div class="bar"><i style="width:{{ p.bar }}%"></i></div></td>
+                <td class="r {% if p.profit_negative %}neg{% endif %}">{{ p.profit_display }}</td>
+                <td>{% if p.highest %}&#8377;{{ p.highest.price }}<br><span class="muted">{{ p.highest.business }} &middot; {{ p.highest.offer_no }}</span>{% endif %}</td></tr>
+        {% empty %}
+            <tr><td colspan="9" class="muted">No quotation was made this month.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+
+    <h2>5. Day by day</h2>
+    {% if chart_max %}
+    <div class="chart"><span class="max">{{ chart_max }}</span>
+        {% for c in chart %}<div class="col{% if c.weekend %} sun{% endif %}" title="{{ c.title }}"><b>{% if c.count %}{{ c.count }}{% endif %}</b><i style="height:{{ c.h }}%"></i></div>{% endfor %}
+    </div>
+    <div class="chart-days">{% for c in chart %}<span>{{ c.n }}</span>{% endfor %}</div>
+    <p class="muted" style="font-size:11px;margin:4px 0 10px">Quotations made on each day of the month. Grey bars are Sundays.</p>
+    {% endif %}
+    <div class="tablebox"><table>
+        <thead><tr><th>Date</th><th class="r">Quotations</th><th>Activity</th><th class="r">kW</th><th class="r">Value</th></tr></thead>
+        <tbody>
+        {% for d in daily %}
+            <tr><td>{{ d.day|date:"D, d M" }}</td><td class="r">{{ d.count }}</td><td><div class="bar"><i style="width:{{ d.bar }}%"></i></div></td><td class="r">{{ d.kw_display }}</td><td class="r">{{ d.value_display }}</td></tr>
+        {% empty %}
+            <tr><td colspan="5" class="muted">Nothing to show.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+
+    <h2>6. What was quoted</h2>
+    <div class="two">
+        <div class="tablebox"><table><thead><tr><th>System type</th><th class="r">Quotations</th><th class="r">kW</th><th class="r">Value</th></tr></thead><tbody>
+            {% for e in by_system %}<tr><td>{{ e.name }}</td><td class="r">{{ e.count }}</td><td class="r">{{ e.kw_display }}</td><td class="r">{{ e.value_display }}</td></tr>{% endfor %}</tbody></table></div>
+        <div class="tablebox"><table><thead><tr><th>Panel type</th><th class="r">Quotations</th><th class="r">kW</th><th class="r">Value</th></tr></thead><tbody>
+            {% for e in by_panel %}<tr><td>{{ e.name }}</td><td class="r">{{ e.count }}</td><td class="r">{{ e.kw_display }}</td><td class="r">{{ e.value_display }}</td></tr>{% endfor %}</tbody></table></div>
+        <div class="tablebox"><table><thead><tr><th>Plant size</th><th class="r">Quotations</th><th class="r">kW</th><th class="r">Value</th></tr></thead><tbody>
+            {% for e in by_size %}<tr><td>{{ e.name }}</td><td class="r">{{ e.count }}</td><td class="r">{{ e.kw_display }}</td><td class="r">{{ e.value_display }}</td></tr>{% endfor %}</tbody></table></div>
+        <div class="tablebox"><table><thead><tr><th>Inverter</th><th class="r">Quotations</th><th class="r">kW</th><th class="r">Value</th></tr></thead><tbody>
+            {% for e in by_inverter %}<tr><td>{{ e.name }}</td><td class="r">{{ e.count }}</td><td class="r">{{ e.kw_display }}</td><td class="r">{{ e.value_display }}</td></tr>{% endfor %}</tbody></table></div>
+        <div class="tablebox"><table><thead><tr><th>Phase</th><th class="r">Quotations</th><th class="r">kW</th><th class="r">Value</th></tr></thead><tbody>
+            {% for e in by_phase %}<tr><td>{{ e.name }}</td><td class="r">{{ e.count }}</td><td class="r">{{ e.kw_display }}</td><td class="r">{{ e.value_display }}</td></tr>{% endfor %}</tbody></table></div>
+        <div class="tablebox"><table><thead><tr><th>Structure</th><th class="r">Quotations</th><th class="r">kW</th><th class="r">Value</th></tr></thead><tbody>
+            {% for e in by_structure %}<tr><td>{{ e.name }}</td><td class="r">{{ e.count }}</td><td class="r">{{ e.kw_display }}</td><td class="r">{{ e.value_display }}</td></tr>{% endfor %}</tbody></table></div>
+    </div>
+    {% if batteries %}<p class="muted" style="font-size:13px">Hybrid quotations this month include {{ batteries }} batter{{ batteries|pluralize:"y,ies" }} in total.</p>{% endif %}
+
+    <h2>7. All quotations of the month</h2>
+    <div class="tablebox"><table>
+        <thead><tr><th>Date</th><th>Offer no.</th><th>Person</th><th>Customer / business</th><th>Type</th><th class="r">kW</th><th class="r">Price</th><th class="r">Profit</th></tr></thead>
+        <tbody>
+        {% for x in quotations %}
+            <tr {% if x.customer %}class="gold-row"{% endif %}><td>{{ x.time|date:"d M, h:i A" }}</td><td class="muted">{{ x.offer_no }}</td><td>{{ x.person }}</td>
+                <td><a href="{% url 'quotation_detail' x.id %}">{{ x.business }}</a>{% if x.customer %} <b>&#10003; customer</b>{% endif %}</td>
+                <td>{{ x.system }}</td><td class="r">{{ x.kw }}</td><td class="r">&#8377;{{ x.price }}</td><td class="r">&#8377;{{ x.profit }}</td></tr>
+        {% empty %}
+            <tr><td colspan="8" class="muted">Nothing to show.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+
+    <div class="foot">Dehlsen Energy &middot; Monthly quotation report for {{ first|date:"F Y" }} &middot; made {{ printed|date:"d M Y, h:i A" }}. Prices include 9% GST; profit is the margin added to the cost. Highlighted rows are confirmed customers.</div>
+</div>
+</body>
+</html>

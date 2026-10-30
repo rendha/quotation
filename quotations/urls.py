@@ -12,6 +12,8 @@ urlpatterns = [
     path( "quotation/<int:quotation_id>/pdf",views.quotation_pdf,name="quotation_pdf"),
     path("person/", views.person_dashboard, name="person_dashboard"),
     path("report/", reports.daily_report, name="daily_report"),
+    path("report/monthly/", reports.monthly_report, name="monthly_report"),
+    path("report/weekly/", reports.weekly_report, name="weekly_report"),
     path("hybrid-calculator/", TemplateView.as_view(template_name="quotations/hybrid_calculator.html"), name="hybrid_calculator"),
     path("login/", login_not_required(auth_views.LoginView.as_view(
         template_name="quotations/login.html", redirect_authenticated_user=True, next_page="quotation_dashboard")), name="login"),

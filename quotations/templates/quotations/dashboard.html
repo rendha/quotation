@@ -208,7 +208,7 @@
         HYBRID CALCULATOR
     </a>
 
-    {% if show_rates %}<p style="margin:10px 0"><a href="{% url 'daily_report' %}" style="color:#3B73B9;font-weight:bold">Daily report: who made how many quotations today &rsaquo;</a></p>{% endif %}
+    {% if show_rates %}<p style="margin:10px 0"><a href="{% url 'daily_report' %}" style="color:#3B73B9;font-weight:bold">Daily report: who made how many quotations today &rsaquo;</a><br><a href="{% url 'monthly_report' %}" style="color:#3B73B9;font-weight:bold">Monthly report: the whole month, who and how much &rsaquo;</a><br><a href="{% url 'weekly_report' %}" style="color:#3B73B9;font-weight:bold">Weekly report: this week, who and how much &rsaquo;</a></p>{% endif %}
 
     <!-- SEARCH: typing narrows the people below at once; Enter / Search looks through ALL quotations -->
     {% url 'search' as search_url %}

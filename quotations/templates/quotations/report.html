@@ -31,7 +31,7 @@
 <body>
 <div class="header"><h1>Daily report</h1></div>
 <div class="container">
-    <p><a href="{% url 'quotation_dashboard' %}">&larr; Quotations</a> &nbsp;&middot;&nbsp; <a href="{% url 'weekly_report' %}">Weekly report &rsaquo;</a> &nbsp;&middot;&nbsp; <a href="{% url 'monthly_report' %}">Monthly report &rsaquo;</a></p>
+    <p style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><a href="{% url 'quotation_dashboard' %}">&larr; Quotations</a> <span style="display:inline-flex;border:1px solid #3B73B9;border-radius:8px;overflow:hidden"><a href="{% url 'daily_report' %}" style="padding:8px 14px;text-decoration:none;font-size:14px;font-weight:bold;background:#3B73B9;color:white">Daily</a><a href="{% url 'weekly_report' %}" style="padding:8px 14px;text-decoration:none;font-size:14px;font-weight:bold;background:white;color:#3B73B9">Weekly</a><a href="{% url 'monthly_report' %}" style="padding:8px 14px;text-decoration:none;font-size:14px;font-weight:bold;background:white;color:#3B73B9">Monthly</a></span></p>
 
     <form class="nav" method="get">
         <a href="?date={{ previous|date:'Y-m-d' }}">&lsaquo; Previous day</a>

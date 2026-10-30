@@ -56,13 +56,13 @@
 <body>
 <div class="tools">
     <a href="{% url 'quotation_dashboard' %}">&larr; Quotations</a>
+    <span style="display:inline-flex;border:1px solid #3B73B9;border-radius:8px;overflow:hidden"><a href="{% url 'daily_report' %}" style="padding:8px 14px;text-decoration:none;font-size:14px;font-weight:bold;background:white;color:#3B73B9">Daily</a><a href="{% url 'weekly_report' %}" style="padding:8px 14px;text-decoration:none;font-size:14px;font-weight:bold;background:#3B73B9;color:white">Weekly</a><a href="{% url 'monthly_report' %}" style="padding:8px 14px;text-decoration:none;font-size:14px;font-weight:bold;background:white;color:#3B73B9">Monthly</a></span>
     <a href="?week={{ previous|date:'Y-m-d' }}">&lsaquo; Previous week</a>
     <a href="?week={{ this_week|date:'Y-m-d' }}" {% if is_this_week %}class="primary"{% endif %}>This week</a>
     <a href="?week={{ last_week|date:'Y-m-d' }}">Last week</a>
     {% if next %}<a href="?week={{ next|date:'Y-m-d' }}">Next week &rsaquo;</a>{% endif %}
     <form method="get" style="display:flex;gap:6px;margin:0"><input type="date" name="week" value="{{ first|date:'Y-m-d' }}" max="{{ this_week|date:'Y-m-d' }}" style="padding:7px;border:1px solid #cbd5e1;border-radius:8px"><button type="submit">Show</button></form>
     <span style="flex:1"></span>
-    <a href="{% url 'monthly_report' %}">Monthly report &rsaquo;</a>
     <button type="button" class="primary" onclick="window.print()">Print / Save as PDF</button>
 </div>
 

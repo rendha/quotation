@@ -181,6 +181,16 @@
         <div class="tablebox"><table><thead><tr><th>Structure</th><th class="r">Quotations</th><th class="r">kW</th><th class="r">Value</th></tr></thead><tbody>
             {% for e in by_structure %}<tr><td>{{ e.name }}</td><td class="r">{{ e.count }}</td><td class="r">{{ e.kw_display }}</td><td class="r">{{ e.value_display }}</td></tr>{% endfor %}</tbody></table></div>
     </div>
+    <h3 style="margin:16px 0 6px">Most used panel and inverter companies</h3>
+    <div class="two">
+        <div class="tablebox"><table><thead><tr><th>Panel company</th><th class="r">Panels</th><th class="r">kW</th><th class="r">Quotations</th><th>Share</th></tr></thead><tbody>
+            {% for e in panel_usage %}<tr{% if forloop.first %} class="gold-row"{% endif %}><td>{% if forloop.first %}&#9733; {% endif %}<b>{{ e.name }}</b></td><td class="r">{{ e.units }}</td><td class="r">{{ e.kw }}</td><td class="r">{{ e.quotations }}</td><td><div class="bar"><i style="width:{{ e.bar }}%"></i></div><span class="muted" style="font-size:11px">{{ e.share }}%</span></td></tr>
+            {% empty %}<tr><td colspan="5" class="muted">No panel was quoted this month.</td></tr>{% endfor %}</tbody></table></div>
+        <div class="tablebox"><table><thead><tr><th>Inverter company</th><th class="r">Inverters</th><th class="r">kW</th><th class="r">Quotations</th><th>Share</th></tr></thead><tbody>
+            {% for e in inverter_usage %}<tr{% if forloop.first %} class="gold-row"{% endif %}><td>{% if forloop.first %}&#9733; {% endif %}<b>{{ e.name }}</b></td><td class="r">{{ e.units }}</td><td class="r">{{ e.kw }}</td><td class="r">{{ e.quotations }}</td><td><div class="bar"><i style="width:{{ e.bar }}%"></i></div><span class="muted" style="font-size:11px">{{ e.share }}%</span></td></tr>
+            {% empty %}<tr><td colspan="5" class="muted">No inverter was quoted this month.</td></tr>{% endfor %}</tbody></table></div>
+    </div>
+    <p class="muted" style="font-size:12px">&#9733; = the most used. One quotation per client is counted (the counted one). Panels = number of panels quoted; a DCR + Non-DCR quotation adds both of its panels.</p>
     {% if batteries %}<p class="muted" style="font-size:13px">Hybrid quotations this month include {{ batteries }} batter{{ batteries|pluralize:"y,ies" }} in total.</p>{% endif %}
 
     <h2>7. All quotations of the month</h2>

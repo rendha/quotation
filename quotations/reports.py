@@ -109,6 +109,58 @@ def _group(quotations, label, sort="value"):
     return out
 
 
+def _picked(quotations):
+    """The quotation that counts for each client (the same rule as every total of the report)."""
+    by_id = {q.id: q for q in quotations}
+    return [by_id[g["picked"]["id"]] for g in stats.group_clients(stats.rows_of(quotations)) if g["picked"]["id"] in by_id]
+
+
+def _company(name):
+    return (name or "").strip().title() or "Not set"
+
+
+def panel_usage(quotations):
+    """
+    Which panel company was used how much: [{name, quotations, units (panels), kw, share, bar}], most panels first.
+    One quotation per client counts (the counted one).  A DCR + Non-DCR quotation adds both of its panels.
+    """
+    groups = OrderedDict()
+    for q in _picked(quotations):
+        for option, quantity in ((q.panel_option, q.panel_quantity_manual or q.panel_quantity or 0), (q.panel2_option, q.panel2_quantity or 0)):
+            if option is None or not quantity:
+                continue
+            entry = groups.setdefault(_company(option.company), {"ids": set(), "units": 0, "watts": ZERO})
+            entry["ids"].add(q.id)
+            entry["units"] += int(quantity)
+            entry["watts"] += Decimal(quantity) * (option.wattage or ZERO)
+    return _usage(groups, "units")
+
+
+def inverter_usage(quotations):
+    """Which inverter company was used how much: [{name, quotations, units (inverters), kw, share, bar}], most inverters first."""
+    groups = OrderedDict()
+    for q in _picked(quotations):
+        label = _inverter_label(q)
+        if label == "Not set":
+            continue
+        entry = groups.setdefault(label, {"ids": set(), "units": 0, "watts": ZERO})
+        entry["ids"].add(q.id)
+        entry["units"] += 1
+        entry["watts"] += (q.inverter_kw or q.system_size or ZERO) * 1000
+    return _usage(groups, "units")
+
+
+def _usage(groups, key):
+    total = sum(g[key] for g in groups.values())
+    rows = [{"name": name, "quotations": len(g["ids"]), "units": g["units"], "kw": stats.number_text((g["watts"] / 1000).quantize(Decimal("0.1"))),
+             "share": int(round(g[key] * 100 / total)) if total else 0} for name, g in groups.items()]
+    rows.sort(key=lambda r: (-r["units"], r["name"]))
+    top = rows[0]["units"] if rows else 0
+    for r in rows:
+        r["bar"] = int(r["units"] * 100 / top) if top else 0
+    return rows
+
+
 def _price(q):
     return q.final_quotation_price or ZERO
 
@@ -190,6 +242,7 @@ def build_month(quotations, first, today, last=None):
         "per_day": round(len(quotations) / days_passed, 1) if days_passed else 0,
         "by_system": _group(quotations, _system_label), "by_panel": _group(quotations, _panel_label), "by_phase": _group(quotations, _phase_label),
         "by_inverter": _group(quotations, _inverter_label), "by_size": _group(quotations, _size_label),
+        "panel_usage": panel_usage(quotations), "inverter_usage": inverter_usage(quotations),
         "by_structure": _group(quotations, lambda q: (q.structure_type or "").strip() or "Not set"),
         "batteries": sum(int(q.battery_quantity or 0) for q in quotations if "hybrid" in (q.system_type or "").lower()),
         "no_name": sum(1 for q in quotations if not stats.name_key(q.customer_name)),

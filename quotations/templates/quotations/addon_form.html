@@ -1,0 +1,29 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>New upgrade quotation</title>{% include "quotations/_pwa_head.html" %}<style>*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f4f7fb;color:#1f2937}.hd{background:#3B73B9;color:#fff;padding:18px 20px}.hd h1{margin:0;font-size:20px}.hd a{color:#fff;font-size:13px}.wrap{max-width:900px;margin:auto;padding:16px}.card{background:#fff;border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 1px 4px rgba(0,0,0,.08)}label{font-size:12px;color:#6b7280;display:block;margin:8px 0 3px}input,textarea{width:100%;padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px}.btn{display:inline-block;background:#3B73B9;color:#fff;border:0;border-radius:8px;padding:10px 16px;font-weight:bold;font-size:14px;text-decoration:none;cursor:pointer}.btn2{background:#e5edf8;color:#3B73B9}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:7px 6px;border-bottom:1px solid #e5e7eb;vertical-align:top}.red{background:#fdecea;border:1px solid #b02a1c;color:#b02a1c;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-weight:bold}.it{border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin:10px 0;background:#fafcff}.g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.sug{border:1px solid #cbd5e1;border-radius:8px;background:#fff;max-height:220px;overflow:auto}.sug div{padding:8px;border-bottom:1px solid #eef2f7;font-size:13px;cursor:pointer}.sug small{color:#6b7280}</style></head><body>
+<div class="hd"><h1>New upgrade / add-on quotation</h1><a href="{% url 'addon_list' %}">&lsaquo; Back</a></div>
+<div class="wrap"><form method="post" id="f">{% csrf_token %}
+{% if error %}<div class="red">{{ error }}</div>{% endif %}
+<div class="card"><label>Customer / business name *</label><input name="customer_name" required value="{{ posted.customer_name }}">
+<div class="g"><div><label>Quotation for (sales person)</label><input name="sales_name" value="{{ posted.sales_name }}"></div><div><label>Location</label><input name="location" value="{{ posted.location }}"></div><div><label>Validity (days)</label><input name="validity_days" inputmode="numeric" value="15"></div></div></div>
+<div class="card"><b>Items</b><p style="font-size:12px;color:#6b7280;margin:4px 0">Type to search the rate list and tap an item, or just type the item yourself. GST: 5% for panels and inverters, 18% for the rest.</p>
+<div id="items"></div><button type="button" class="btn btn2" onclick="addRow()">+ Add item</button>
+<p id="tot" style="text-align:right;font-weight:bold"></p></div>
+<button class="btn">Save quotation</button></form></div>
+<script>
+var SHOW={% if show_rates %}true{% else %}false{% endif %};
+function el(h){var d=document.createElement('div');d.innerHTML=h;return d.firstChild}
+function addRow(){
+ var r=el('<div class="it"><input type="hidden" name="product_id"><label>Item (type to search)</label><input name="description" autocomplete="off"><div class="sug" style="display:none"></div>'+
+ '<label>Specification</label><input name="specification"><div class="g"><div><label>Make</label><input name="make"></div><div><label>Qty</label><input name="quantity" value="1" inputmode="decimal"></div><div><label>Unit</label><input name="unit" value="Nos"></div></div>'+
+ '<div class="g"><div class="rt"><label>Rate (before GST)</label><input name="rate" inputmode="decimal"></div><div><label>GST %</label><input name="gst" value="18" inputmode="decimal"></div><div><label>&nbsp;</label><button type="button" class="btn btn2" onclick="this.closest(\'.it\').remove();sum()">Remove</button></div></div></div>');
+ document.getElementById('items').appendChild(r);
+ var inp=r.querySelector('[name=description]'),box=r.querySelector('.sug'),t;
+ inp.addEventListener('input',function(){r.querySelector('[name=product_id]').value='';r.querySelector('.rt').style.display='';clearTimeout(t);var q=inp.value.trim();if(q.length<2){box.style.display='none';return}
+  t=setTimeout(function(){fetch('{% url "addon_products" %}?q='+encodeURIComponent(q)).then(function(x){return x.json()}).then(function(j){
+   box.innerHTML='';j.results.forEach(function(p){var d=el('<div></div>');d.innerHTML='<b></b> <small></small>';d.querySelector('b').textContent=p.name;d.querySelector('small').textContent=(p.make?p.make+' · ':'')+p.category+(p.rate?' · ₹'+p.rate:'');
+    d.onclick=function(){inp.value=p.name;r.querySelector('[name=product_id]').value=p.id;r.querySelector('[name=specification]').value=p.spec||'';r.querySelector('[name=make]').value=p.make||'';r.querySelector('[name=unit]').value=p.unit||'Nos';r.querySelector('[name=gst]').value=p.gst;
+     if(p.rate){r.querySelector('[name=rate]').value=p.rate}else{r.querySelector('.rt').style.display='none'}box.style.display='none';sum()};box.appendChild(d)});
+   box.style.display=j.results.length?'block':'none'})},250)});
+ r.addEventListener('input',sum)}
+function sum(){if(!SHOW){return}var t=0;document.querySelectorAll('.it').forEach(function(r){var q=+r.querySelector('[name=quantity]').value||0,p=+r.querySelector('[name=rate]').value||0,g=+r.querySelector('[name=gst]').value||0;t+=q*p*(1+g/100)});document.getElementById('tot').textContent='Total (GST included): ₹ '+t.toFixed(2)}
+addRow();
+</script></body></html>

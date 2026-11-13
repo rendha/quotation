@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+@page { size: 595.56pt 842.04pt; margin: 0; }
+{% include "_base_css.html" %}
+table.s { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 7.5pt; color: #111; }
+table.s th { background: #0070c0; color: #fff; font-weight: 300; font-size: 8.5pt; height: 19pt; border: .6pt solid #000; }
+table.s td { border: .6pt solid #000; padding: 2.5pt 3pt; background: #fff; vertical-align: middle; line-height: 1.25; }
+.tot { color: #2f6db5; text-align: right; font-weight: 500; font-size: 11pt; margin-top: 6pt; }
+.brk { color: #2f6db5; text-align: right; font-weight: 300; font-size: 8pt; margin-top: 4pt; }
+.term { color: #222; font-size: 9pt; font-weight: 400; }
+.bank { color: #2e75b6; font-size: 10.5pt; line-height: 14.5pt; font-weight: 500; }
+.row  { color: #2f6db5; font-size: 9.6pt; line-height: 14pt; font-weight: 400; }
+</style></head>
+<body>
+<div class="page">
+  <img class="bg" src="{{ assets }}summary_base.jpg">
+  <div class="abs" style="left:50pt; top:{% if overflow %}120{% else %}104{% endif %}pt; width:495pt; white-space:normal;">
+    {% if rows %}
+    <table class="s"><thead><tr><th style="width:26pt">Sr</th><th style="width:80pt">Particular</th><th>Specification</th><th style="width:38pt">QTY</th><th style="width:62pt">MAKE</th></tr></thead><tbody>
+    {% for r in rows %}<tr><td>{{ r.sr }}</td><td>{{ r.particular }}</td><td>{{ r.spec }}</td><td>{{ r.qty }}</td><td>{{ r.make }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<div class="row">Items: as per the BOQ on the previous page</div>{% endif %}
+    <div class="brk">Taxable value {{ taxable }} &nbsp;|&nbsp; {{ gst_low }} &nbsp;|&nbsp; {{ gst_high }}</div>
+    <div class="tot">Total value : {{ total }} <span style="font-size:8pt; font-weight:300;">(GST included)</span></div>
+  </div>
+
+  <div class="abs term" style="left:61pt; top:622pt; line-height:15.5pt;">
+    {% for t in payment_terms %}<div><span style="display:inline-block; width:9pt;">&bull;</span>{{ t }}</div>{% endfor %}
+    <div style="padding-left:9pt;">{{ payment_note }}</div>
+  </div>
+  {% for b in bank_lines %}<div class="abs bank" style="left:70pt; top:{{ b.top }}pt;">{{ b.text }}</div>
+  {% endfor %}
+</div>
+</body></html>

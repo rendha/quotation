@@ -1082,4 +1082,6 @@ class PaymentDetails(models.Model):
         verbose_name_plural = "Payment details"
 
     def __str__(self):
-        return "%s - %s" % (self.beneficiary_name, self.bank_name)        
+        return "%s - %s" % (self.beneficiary_name, self.bank_name)
+
+from .addon_models import AddonQuotation, AddonItem  # noqa: E402,F401  (upgrade / add-on quotation)

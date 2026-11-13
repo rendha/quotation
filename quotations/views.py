@@ -6,6 +6,7 @@ HTTP only:  read the form  ->  save selections / quantities  ->  calculate_quota
 
 No money is calculated here.  Every amount comes from quotations/calculations.py.
 """
+import hashlib
 import hmac
 import os
 import time
@@ -76,16 +77,23 @@ def _model_has_field(model, name):
 
 RATES_COOKIE = "rates_unlock"
 RATES_SALT = "dehlsen-rates-v1"
-RATES_UNLOCK_HOURS = 8
+RATES_UNLOCK_HOURS = 24 * 365 * 10      # stays unlocked until the Lock button is pressed or the ADMIN_PASSKEY is changed
+
+
+def _passkey_mark():
+    """A fingerprint of the current ADMIN_PASSKEY: changing the passkey locks every device again."""
+    passkey = os.environ.get("ADMIN_PASSKEY", "")
+    return hashlib.sha256(("rates:" + passkey).encode()).hexdigest()[:20] if passkey else ""
 
 
 def rates_unlocked(request):
-    """True when this browser entered the right passkey in the last RATES_UNLOCK_HOURS hours."""
+    """True when this browser entered the right passkey (until it presses Lock, or the passkey is changed)."""
     token = request.COOKIES.get(RATES_COOKIE)
-    if not token:
+    mark = _passkey_mark()
+    if not token or not mark:
         return False
     try:
-        return signing.loads(token, salt=RATES_SALT, max_age=RATES_UNLOCK_HOURS * 3600) == "ok"
+        return signing.loads(token, salt=RATES_SALT, max_age=RATES_UNLOCK_HOURS * 3600) == mark
     except signing.BadSignature:
         return False
 
@@ -104,7 +112,7 @@ def unlock_rates(request):
     target = _safe_next(request, reverse("quotation_dashboard"))
     if passkey and hmac.compare_digest(given.encode(), passkey.encode()):
         response = redirect(target)
-        response.set_cookie(RATES_COOKIE, signing.dumps("ok", salt=RATES_SALT), max_age=RATES_UNLOCK_HOURS * 3600,
+        response.set_cookie(RATES_COOKIE, signing.dumps(_passkey_mark(), salt=RATES_SALT), max_age=RATES_UNLOCK_HOURS * 3600,
                             httponly=True, secure=request.is_secure(), samesite="Lax")
         return response
     time.sleep(1)                                           # slows down guessing

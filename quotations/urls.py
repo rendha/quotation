@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, addon_views
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_not_required
 from django.views.generic import TemplateView
@@ -32,4 +32,9 @@ urlpatterns = [
     path("rates/lock/", views.lock_rates, name="lock_rates"),
     path("pdf/<int:quotation_id>/<str:filename>", views.quotation_pdf, name="quotation_pdf_named"),
     path("view/<int:quotation_id>/<str:filename>", views.quotation_pdf_view, name="quotation_pdf_view"),
+    path("upgrade/", addon_views.addon_list, name="addon_list"),
+    path("upgrade/new/", addon_views.addon_new, name="addon_new"),
+    path("upgrade/api/products/", addon_views.addon_products, name="addon_products"),
+    path("upgrade/<int:pk>/", addon_views.addon_detail, name="addon_detail"),
+    path("upgrade/<int:pk>/pdf", addon_views.addon_pdf, name="addon_pdf"),
 ]

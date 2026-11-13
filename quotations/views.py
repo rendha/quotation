@@ -717,6 +717,13 @@ def _person_url():
         return ""
 
 
+def low_margin(request):
+    """Admin passkey only: the quotations given below their calculated price (who, calculated value, their value, margin lost, margin now)."""
+    from . import low_margin as lm
+    unlocked = rates_unlocked(request)
+    return render(request, "quotations/low_margin.html", {"rows": lm.rows() if unlocked else [], "show_rates": unlocked})
+
+
 def dashboard(request):
     """All quotations, the totals of everybody, and one line per person (click a name for his own totals)."""
     quotations = list(Quotation.objects.order_by("-created_at"))

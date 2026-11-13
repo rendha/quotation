@@ -816,6 +816,22 @@ def _compute(quotation):
                 "Clear the Final Quotation Price box and save to use the calculated price."
                 % (plain_number(final_price), plain_number((gap * HUNDRED).quantize(Decimal("1"))), plain_number(suggested_price)))
 
+    # a price BELOW the calculated one eats the margin: work out what is left (the margin is the selling price - cost; GST is on top of it)
+    margin_drop = None
+    if final_is_manual and suggested_price > 0 and final_price < suggested_price:
+        actual_selling = money(final_price * HUNDRED / (HUNDRED + GST_RATE))
+        actual_margin = money(actual_selling - calculated_cost)
+        margin_drop = {
+            "below": money(suggested_price - final_price),
+            "planned_amount": margin_amount, "planned_percent": money(gp_percent),
+            "actual_amount": actual_margin,
+            "actual_percent": money(actual_margin * HUNDRED / actual_selling) if actual_selling > 0 else ZERO,
+            "loss": actual_margin < 0,
+        }
+        warnings.append("The margin is decreasing: the Final Quotation Price (Rs %s) is Rs %s below the calculated price (Rs %s).%s"
+                        % (plain_number(final_price), plain_number(margin_drop["below"]), plain_number(suggested_price),
+                           " At this price the quotation is sold at a LOSS." if margin_drop["loss"] else ""))
+
     # ---- what the page shows for checking ---------------------------------------------------------------------
     counted_items = [{"name": c["name"], "quantity": c["quantity"], "rate": c["rate"], "amount": c["amount"]}
                      for c in components.values() if c["amount"] > 0]
@@ -841,6 +857,7 @@ def _compute(quotation):
         "gst_rate": GST_RATE, "gst_amount": gst_amount,
         "suggested_price": suggested_price, "final_price": final_price, "final_is_manual": final_is_manual,
         "round_off": final_price - suggested_price,
+        "margin_drop": margin_drop,
     }
 
 

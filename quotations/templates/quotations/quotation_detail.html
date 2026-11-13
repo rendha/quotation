@@ -580,6 +580,14 @@
                 <ul>{% for w in summary.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
             </div>
         {% endif %}
+        {% if show_rates and summary.margin_drop %}{% with m=summary.margin_drop %}
+            <div style="background:#fdecec;border:2px solid #c0392b;border-radius:12px;padding:12px 14px;margin:12px 0;color:#b02a1c">
+                <strong>&#9888; Margin is decreasing{% if m.loss %} &mdash; this price makes a LOSS{% endif %}</strong>
+                <div style="border-top:1px solid #e8a39b;margin-top:8px;padding-top:6px">Calculated margin: <b>&#8377;{{ m.planned_amount|floatformat:2 }} ({{ m.planned_percent|floatformat:"-2" }}%)</b></div>
+                <div style="border-top:1px solid #e8a39b;margin-top:6px;padding-top:6px">Margin at this price: <b>&#8377;{{ m.actual_amount|floatformat:2 }} ({{ m.actual_percent|floatformat:"-2" }}%)</b></div>
+                <div style="border-top:1px solid #e8a39b;margin-top:6px;padding-top:6px">The price is <b>&#8377;{{ m.below|floatformat:2 }}</b> below the calculated price.</div>
+            </div>
+        {% endwith %}{% endif %}
 
         {% if show_rates %}
         <div class="calc-box">

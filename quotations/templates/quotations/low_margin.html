@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Low-margin quotations</title>
+<style>
+body{margin:0;font-family:system-ui,"Segoe UI",Roboto,sans-serif;background:#f4f7fb;color:#1d2733}.wrap{max-width:1000px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 4px}.sub{color:#6b7788;font-size:13px;margin-bottom:14px}a{color:#3B73B9}
+.card{background:#fff;border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 10px rgba(30,50,80,.06);border-left:5px solid #c0392b}
+.row{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.red{color:#b02a1c}.line{border-top:1px solid #f0c4be;margin-top:8px;padding-top:6px;color:#b02a1c}
+.tag{display:inline-block;font-size:11px;border-radius:999px;padding:2px 8px;background:#e3f5ea;color:#2e9e5b}.loss{background:#c0392b;color:#fff;border-radius:6px;padding:1px 7px;font-size:12px}
+</style></head><body><div class="wrap">
+<p><a href="{% url 'quotation_dashboard' %}">&larr; Back to Quotations</a></p>
+<h1>Low-margin quotations</h1><div class="sub">Quotations given at a price below the calculated price. Admin passkey view.</div>
+{% if not show_rates %}<div class="card">Enter the admin passkey on the Quotations page first.</div>{% endif %}
+{% for r in rows %}<div class="card">
+<div class="row"><div><b>{{ r.offer_no }}</b> &middot; {{ r.client }}{% if r.is_customer %} <span class="tag">customer</span>{% endif %}<br><small style="color:#6b7788">Quoted by <b>{{ r.person }}</b> &middot; {{ r.date|date:"d M Y" }}</small></div>
+<div style="text-align:right">{% if r.loss %}<span class="loss">LOSS</span><br>{% endif %}<b class="red">&minus;&#8377;{{ r.lost|floatformat:0 }} margin</b></div></div>
+<div class="line">Calculated quotation value: <b>&#8377;{{ r.calculated_value|floatformat:0 }}</b></div>
+<div class="line">Their quotation value: <b>&#8377;{{ r.their_value|floatformat:0 }}</b> (&#8377;{{ r.below|floatformat:0 }} lower)</div>
+<div class="line">Margin decreased from <b>&#8377;{{ r.was_amount|floatformat:0 }} ({{ r.was_percent|floatformat:"-1" }}%)</b></div>
+<div class="line">Margin now: <b>&#8377;{{ r.now_amount|floatformat:0 }} ({{ r.now_percent|floatformat:"-1" }}%)</b></div>
+<div style="margin-top:8px"><a href="{% url 'quotation_detail' r.id %}">Open quotation &rsaquo;</a></div>
+</div>{% empty %}{% if show_rates %}<div class="card" style="border-left-color:#2e9e5b">No quotation is below its calculated price.</div>{% endif %}{% endfor %}
+</div></body></html>

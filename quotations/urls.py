@@ -27,6 +27,7 @@ urlpatterns = [
     path("quotation/<int:quotation_id>/customer/", views.confirm_customer, name="confirm_customer"),
     path("customer/confirm/", views.confirm_customer, name="confirm_customer_choice"),
     path("quotation/<int:quotation_id>/counted/", views.set_counted, name="set_counted"),
+    path("margin/", views.low_margin, name="low_margin"),
     path("rates/unlock/", views.unlock_rates, name="unlock_rates"),
     path("rates/lock/", views.lock_rates, name="lock_rates"),
     path("pdf/<int:quotation_id>/<str:filename>", views.quotation_pdf, name="quotation_pdf_named"),
